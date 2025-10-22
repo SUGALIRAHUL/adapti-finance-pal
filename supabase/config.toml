@@ -1,0 +1,10 @@
+project_id = "nrklkkcvystviqbztfnu"
+
+[functions.ai-tutor]
+verify_jwt = true
+
+[functions.investment-recommendations]
+verify_jwt = true
+
+[functions.mfa-setup]
+verify_jwt = true
