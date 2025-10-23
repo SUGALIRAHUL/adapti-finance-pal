@@ -4,9 +4,18 @@ import * as OTPAuth from "https://deno.land/x/otpauth@v9.1.4/dist/otpauth.esm.js
 
 // Encryption utilities using Web Crypto API
 async function getEncryptionKey(): Promise<CryptoKey> {
-  const keyMaterial = Deno.env.get('MFA_ENCRYPTION_KEY') || 'default-encryption-key-change-in-production';
+  const keyMaterial = Deno.env.get('MFA_ENCRYPTION_KEY');
+  
+  if (!keyMaterial) {
+    throw new Error('MFA_ENCRYPTION_KEY environment variable must be configured');
+  }
+  
+  if (keyMaterial.length < 32) {
+    throw new Error('MFA_ENCRYPTION_KEY must be at least 32 characters long');
+  }
+  
   const enc = new TextEncoder();
-  const keyData = enc.encode(keyMaterial.padEnd(32, '0').substring(0, 32));
+  const keyData = enc.encode(keyMaterial.substring(0, 32));
   
   return await crypto.subtle.importKey(
     'raw',
