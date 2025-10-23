@@ -8,6 +8,27 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { toast } from "@/hooks/use-toast";
 import logo from "@/assets/finance-tutor-logo.png";
+import { z } from "zod";
+
+const signupSchema = z.object({
+  email: z.string().email('Invalid email address').max(255, 'Email too long'),
+  password: z.string()
+    .min(12, 'Password must be at least 12 characters')
+    .regex(/[A-Z]/, 'Password must contain an uppercase letter')
+    .regex(/[a-z]/, 'Password must contain a lowercase letter')
+    .regex(/[0-9]/, 'Password must contain a number')
+    .regex(/[^A-Za-z0-9]/, 'Password must contain a special character'),
+  fullName: z.string()
+    .trim()
+    .min(1, 'Name required')
+    .max(100, 'Name too long')
+    .regex(/^[a-zA-Z\s\-']+$/, 'Name contains invalid characters')
+});
+
+const loginSchema = z.object({
+  email: z.string().email('Invalid email address').max(255, 'Email too long'),
+  password: z.string().min(1, 'Password required')
+});
 
 export default function Auth() {
   const navigate = useNavigate();
@@ -18,11 +39,23 @@ export default function Auth() {
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
+    
+    // Validate inputs
+    const validation = loginSchema.safeParse({ email, password });
+    if (!validation.success) {
+      toast({
+        variant: "destructive",
+        title: "Validation Error",
+        description: validation.error.errors[0].message,
+      });
+      return;
+    }
+
     setLoading(true);
 
     const { error } = await supabase.auth.signInWithPassword({
-      email,
-      password,
+      email: validation.data.email,
+      password: validation.data.password,
     });
 
     if (error) {
@@ -44,15 +77,27 @@ export default function Auth() {
 
   const handleSignup = async (e: React.FormEvent) => {
     e.preventDefault();
+    
+    // Validate inputs
+    const validation = signupSchema.safeParse({ email, password, fullName });
+    if (!validation.success) {
+      toast({
+        variant: "destructive",
+        title: "Validation Error",
+        description: validation.error.errors[0].message,
+      });
+      return;
+    }
+
     setLoading(true);
 
     const { error } = await supabase.auth.signUp({
-      email,
-      password,
+      email: validation.data.email,
+      password: validation.data.password,
       options: {
         emailRedirectTo: `${window.location.origin}/dashboard`,
         data: {
-          full_name: fullName,
+          full_name: validation.data.fullName,
         },
       },
     });

@@ -8,6 +8,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Plus, Trash2 } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
+import { z } from "zod";
 
 type Budget = {
   id: string;
@@ -16,6 +17,19 @@ type Budget = {
   period: string;
   start_date: string;
 };
+
+const budgetSchema = z.object({
+  category: z.string()
+    .trim()
+    .min(1, 'Category required')
+    .max(50, 'Category too long')
+    .regex(/^[a-zA-Z0-9\s&\-]+$/, 'Invalid characters in category'),
+  amount: z.number()
+    .min(0.01, 'Amount must be positive')
+    .max(10000000, 'Amount too large'),
+  period: z.enum(['weekly', 'monthly', 'yearly']),
+  start_date: z.string()
+});
 
 export default function Budget() {
   const [budgets, setBudgets] = useState<Budget[]>([]);
@@ -58,16 +72,34 @@ export default function Budget() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    
+    // Validate inputs
+    const validation = budgetSchema.safeParse({
+      category: formData.category,
+      amount: parseFloat(formData.amount),
+      period: formData.period,
+      start_date: formData.start_date
+    });
+    
+    if (!validation.success) {
+      toast({
+        variant: "destructive",
+        title: "Validation Error",
+        description: validation.error.errors[0].message,
+      });
+      return;
+    }
+
     try {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return;
 
       const { error } = await supabase.from("budgets").insert({
         user_id: user.id,
-        category: formData.category,
-        amount: parseFloat(formData.amount),
-        period: formData.period,
-        start_date: formData.start_date,
+        category: validation.data.category,
+        amount: validation.data.amount,
+        period: validation.data.period,
+        start_date: validation.data.start_date,
       });
 
       if (error) throw error;

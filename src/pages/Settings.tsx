@@ -6,6 +6,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Shield } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
+import { QRCodeCanvas } from "qrcode.react";
 
 export default function Settings() {
   const [mfaEnabled, setMfaEnabled] = useState(false);
@@ -107,7 +108,7 @@ export default function Settings() {
                 <div className="space-y-4">
                   <div>
                     <p className="text-sm mb-2">Scan this QR code with your authenticator app:</p>
-                    <img src={`https://api.qrserver.com/v1/create-qr-code/?data=${encodeURIComponent(qrCode)}&size=200x200`} alt="QR Code" />
+                    <QRCodeCanvas value={qrCode} size={200} level="H" />
                   </div>
                   <div>
                     <Label>Enter verification code</Label>

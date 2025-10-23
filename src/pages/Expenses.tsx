@@ -7,6 +7,22 @@ import { Label } from "@/components/ui/label";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Plus } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
+import { z } from "zod";
+
+const expenseSchema = z.object({
+  category: z.string()
+    .trim()
+    .min(1, 'Category required')
+    .max(50, 'Category too long')
+    .regex(/^[a-zA-Z0-9\s&\-]+$/, 'Invalid characters in category'),
+  amount: z.number()
+    .min(0.01, 'Amount must be positive')
+    .max(10000000, 'Amount too large'),
+  description: z.string()
+    .max(500, 'Description too long')
+    .optional(),
+  date: z.string()
+});
 
 export default function Expenses() {
   const [expenses, setExpenses] = useState<any[]>([]);
@@ -37,15 +53,33 @@ export default function Expenses() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    
+    // Validate inputs
+    const validation = expenseSchema.safeParse({
+      category: formData.category,
+      amount: parseFloat(formData.amount),
+      description: formData.description || undefined,
+      date: formData.date
+    });
+    
+    if (!validation.success) {
+      toast({
+        variant: "destructive",
+        title: "Validation Error",
+        description: validation.error.errors[0].message,
+      });
+      return;
+    }
+
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) return;
 
     const { error } = await supabase.from("expenses").insert({
       user_id: user.id,
-      category: formData.category,
-      amount: parseFloat(formData.amount),
-      description: formData.description,
-      date: formData.date,
+      category: validation.data.category,
+      amount: validation.data.amount,
+      description: validation.data.description,
+      date: validation.data.date,
     });
 
     if (!error) {
