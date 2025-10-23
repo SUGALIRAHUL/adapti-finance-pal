@@ -1,5 +1,6 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { z } from "https://deno.land/x/zod@v3.22.4/mod.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -12,7 +13,29 @@ serve(async (req) => {
   }
 
   try {
-    const { messages, type = 'chat' } = await req.json();
+    const requestBody = await req.json();
+    
+    // Validate input
+    const tutorSchema = z.object({
+      messages: z.array(z.object({
+        role: z.enum(['user', 'assistant']),
+        content: z.string().max(5000, 'Message content too long')
+      })).min(1, 'At least one message required').max(50, 'Too many messages'),
+      type: z.enum(['chat', 'quiz']).optional().default('chat')
+    });
+
+    const validationResult = tutorSchema.safeParse(requestBody);
+    if (!validationResult.success) {
+      return new Response(JSON.stringify({ 
+        error: 'Invalid input', 
+        details: validationResult.error.issues 
+      }), {
+        status: 400,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+
+    const { messages, type } = validationResult.data;
     const authHeader = req.headers.get('Authorization')!;
     const supabaseClient = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',

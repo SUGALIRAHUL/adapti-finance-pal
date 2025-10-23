@@ -1,5 +1,6 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { z } from "https://deno.land/x/zod@v3.22.4/mod.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -12,7 +13,26 @@ serve(async (req) => {
   }
 
   try {
-    const { riskProfile = 'moderate', investmentAmount = 10000 } = await req.json();
+    const requestBody = await req.json();
+    
+    // Validate input
+    const investmentSchema = z.object({
+      riskProfile: z.enum(['conservative', 'moderate', 'aggressive']).optional().default('moderate'),
+      investmentAmount: z.number().min(1, 'Investment amount must be positive').max(1000000000, 'Investment amount too large').optional().default(10000)
+    });
+
+    const validationResult = investmentSchema.safeParse(requestBody);
+    if (!validationResult.success) {
+      return new Response(JSON.stringify({ 
+        error: 'Invalid input', 
+        details: validationResult.error.issues 
+      }), {
+        status: 400,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+
+    const { riskProfile, investmentAmount } = validationResult.data;
     const authHeader = req.headers.get('Authorization')!;
     const supabaseClient = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
