@@ -3,19 +3,27 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import * as OTPAuth from "https://deno.land/x/otpauth@v9.1.4/dist/otpauth.esm.js";
 
 // Encryption utilities using Web Crypto API
+function hexToBuffer(hex: string): ArrayBuffer {
+  const bytes = new Uint8Array(hex.length / 2);
+  for (let i = 0; i < hex.length; i += 2) {
+    bytes[i / 2] = parseInt(hex.substr(i, 2), 16);
+  }
+  return bytes.buffer;
+}
+
 async function getEncryptionKey(): Promise<CryptoKey> {
   const keyMaterial = Deno.env.get('MFA_ENCRYPTION_KEY');
   
   if (!keyMaterial) {
-    throw new Error('MFA_ENCRYPTION_KEY environment variable must be configured');
+    throw new Error('MFA_ENCRYPTION_KEY environment variable must be configured. Generate a secure key using: openssl rand -hex 32');
   }
   
-  if (keyMaterial.length < 32) {
-    throw new Error('MFA_ENCRYPTION_KEY must be at least 32 characters long');
+  // Require 64-character hex string (32 bytes = 256 bits)
+  if (!/^[0-9a-f]{64}$/i.test(keyMaterial)) {
+    throw new Error('MFA_ENCRYPTION_KEY must be a 64-character hexadecimal string (256-bit key). Generate using: openssl rand -hex 32');
   }
   
-  const enc = new TextEncoder();
-  const keyData = enc.encode(keyMaterial.substring(0, 32));
+  const keyData = hexToBuffer(keyMaterial);
   
   return await crypto.subtle.importKey(
     'raw',
