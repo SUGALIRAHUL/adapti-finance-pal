@@ -1,7 +1,21 @@
 import { useEffect, useState } from "react";
+import { z } from "zod";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { RadialProgress } from "@/components/RadialProgress";
+
+const goalSchema = z
+  .object({
+    id: z.any(),
+    name: z.string().trim().min(1).max(100),
+    target_amount: z.coerce.number().min(0).max(1_000_000_000),
+    current_amount: z.coerce.number().min(0).max(1_000_000_000),
+    user_id: z.string().uuid().optional(),
+    deadline: z.string().optional().nullable(),
+  })
+  .passthrough();
+
+const goalsSchema = z.array(goalSchema);
 
 export default function Goals() {
   const [goals, setGoals] = useState<any[]>([]);
@@ -19,9 +33,13 @@ export default function Goals() {
       .select("*")
       .eq("user_id", user.id);
 
-    setGoals(data || []);
+    const parsed = goalsSchema.safeParse(data ?? []);
+    if (parsed.success) {
+      setGoals(parsed.data);
+    } else {
+      setGoals([]);
+    }
   };
-
   return (
     <div className="space-y-6">
       <h1 className="text-3xl font-bold bg-gradient-to-r from-primary to-secondary bg-clip-text text-transparent">
@@ -30,7 +48,9 @@ export default function Goals() {
 
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
         {goals.map((goal) => {
-          const progress = (Number(goal.current_amount) / Number(goal.target_amount)) * 100;
+          const current = Number(goal.current_amount) || 0;
+          const target = Number(goal.target_amount) || 0;
+          const progress = target > 0 ? Math.min(100, (current / target) * 100) : 0;
           return (
             <Card key={goal.id}>
               <CardHeader><CardTitle>{goal.name}</CardTitle></CardHeader>

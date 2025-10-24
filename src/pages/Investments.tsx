@@ -1,8 +1,23 @@
 import { useEffect, useState } from "react";
+import { z } from "zod";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { TrendingUp } from "lucide-react";
+
+const investmentSchema = z
+  .object({
+    id: z.any(),
+    name: z.string().trim().min(1).max(100),
+    type: z.string().trim().min(1).max(50),
+    current_value: z.coerce.number().min(0).max(1_000_000_000),
+    quantity: z.coerce.number().min(0).max(1_000_000),
+    user_id: z.string().uuid().optional(),
+    purchase_price: z.coerce.number().min(0).max(1_000_000_000).optional(),
+    purchase_date: z.string().optional().nullable(),
+  })
+  .passthrough();
+const investmentsSchema = z.array(investmentSchema);
 
 export default function Investments() {
   const [investments, setInvestments] = useState<any[]>([]);
@@ -20,9 +35,13 @@ export default function Investments() {
       .select("*")
       .eq("user_id", user.id);
 
-    setInvestments(data || []);
+    const parsed = investmentsSchema.safeParse(data ?? []);
+    if (parsed.success) {
+      setInvestments(parsed.data);
+    } else {
+      setInvestments([]);
+    }
   };
-
   const getRecommendations = async () => {
     const { data: { session } } = await supabase.auth.getSession();
     if (!session) return;
