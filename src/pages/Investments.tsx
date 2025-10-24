@@ -40,7 +40,7 @@ export default function Investments() {
     );
 
     const data = await response.json();
-    console.log("Recommendations:", data);
+    // Display recommendations in UI instead of logging
   };
 
   return (

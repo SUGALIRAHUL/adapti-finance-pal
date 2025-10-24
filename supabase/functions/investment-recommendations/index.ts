@@ -48,6 +48,35 @@ serve(async (req) => {
       });
     }
 
+    // Check if MFA is enabled and enforce it
+    const { data: mfaData } = await supabaseClient
+      .from('mfa_secrets')
+      .select('enabled')
+      .eq('user_id', user.id)
+      .single();
+
+    if (mfaData?.enabled) {
+      const mfaToken = req.headers.get('X-MFA-Token');
+      if (!mfaToken) {
+        return new Response(
+          JSON.stringify({ error: 'MFA token required for this operation' }),
+          { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+
+      // Validate MFA token
+      const validateResponse = await supabaseClient.functions.invoke('mfa-setup', {
+        body: { action: 'validate', token: mfaToken }
+      });
+
+      if (validateResponse.error || !validateResponse.data?.valid) {
+        return new Response(
+          JSON.stringify({ error: 'Invalid MFA token' }),
+          { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+    }
+
     // Get user's existing investments for context
     const { data: investments } = await supabaseClient
       .from('investments')
