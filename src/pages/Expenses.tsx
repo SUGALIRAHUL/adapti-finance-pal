@@ -122,7 +122,7 @@ export default function Expenses() {
                 <p className="text-sm text-muted-foreground">{expense.description}</p>
                 <p className="text-xs text-muted-foreground">{new Date(expense.date).toLocaleDateString()}</p>
               </div>
-              <div className="text-xl font-bold text-destructive">${Number(expense.amount).toFixed(2)}</div>
+              <div className="text-xl font-bold text-destructive">₹{Number(expense.amount).toFixed(2)}</div>
             </CardContent>
           </Card>
         ))}

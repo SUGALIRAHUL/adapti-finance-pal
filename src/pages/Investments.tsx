@@ -62,7 +62,7 @@ export default function Investments() {
             <CardContent>
               <div className="space-y-2">
                 <p className="text-sm"><span className="font-semibold">Type:</span> {inv.type}</p>
-                <p className="text-sm"><span className="font-semibold">Current Value:</span> ${Number(inv.current_value).toFixed(2)}</p>
+                <p className="text-sm"><span className="font-semibold">Current Value:</span> ₹{Number(inv.current_value).toFixed(2)}</p>
                 <p className="text-sm"><span className="font-semibold">Quantity:</span> {inv.quantity}</p>
               </div>
             </CardContent>

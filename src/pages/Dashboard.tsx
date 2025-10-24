@@ -59,19 +59,19 @@ export default function Dashboard() {
   const statCards = [
     {
       title: "Total Budget",
-      value: `$${stats.totalBudget.toFixed(2)}`,
+      value: `₹${stats.totalBudget.toFixed(2)}`,
       icon: Wallet,
       color: "text-primary",
     },
     {
       title: "Total Expenses",
-      value: `$${stats.totalExpenses.toFixed(2)}`,
+      value: `₹${stats.totalExpenses.toFixed(2)}`,
       icon: TrendingUp,
       color: "text-destructive",
     },
     {
       title: "Investments",
-      value: `$${stats.totalInvestments.toFixed(2)}`,
+      value: `₹${stats.totalInvestments.toFixed(2)}`,
       icon: BarChart3,
       color: "text-secondary",
     },

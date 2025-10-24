@@ -231,7 +231,7 @@ export default function Budget() {
             </CardHeader>
             <CardContent>
               <div className="text-2xl font-bold text-primary">
-                ${Number(budget.amount).toFixed(2)}
+                ₹{Number(budget.amount).toFixed(2)}
               </div>
               <p className="text-sm text-muted-foreground capitalize">
                 {budget.period}

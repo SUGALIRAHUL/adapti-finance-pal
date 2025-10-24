@@ -38,7 +38,7 @@ export default function Goals() {
                 <RadialProgress value={progress} size={120} />
                 <div className="text-center">
                   <p className="text-sm text-muted-foreground">
-                    ${Number(goal.current_amount).toFixed(2)} / ${Number(goal.target_amount).toFixed(2)}
+                    ₹{Number(goal.current_amount).toFixed(2)} / ₹{Number(goal.target_amount).toFixed(2)}
                   </p>
                 </div>
               </CardContent>
