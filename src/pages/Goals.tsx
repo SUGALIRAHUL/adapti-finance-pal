@@ -3,6 +3,14 @@ import { z } from "zod";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { RadialProgress } from "@/components/RadialProgress";
+import { Button } from "@/components/ui/button";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
+import { Input } from "@/components/ui/input";
+import { useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { Plus } from "lucide-react";
+import { useToast } from "@/hooks/use-toast";
 
 const goalSchema = z
   .object({
@@ -17,8 +25,27 @@ const goalSchema = z
 
 const goalsSchema = z.array(goalSchema);
 
+const createGoalSchema = z.object({
+  name: z.string().trim().min(1, "Name is required").max(100),
+  target_amount: z.coerce.number().min(0.01, "Target amount must be greater than 0").max(1_000_000_000),
+  current_amount: z.coerce.number().min(0).max(1_000_000_000),
+  deadline: z.string().optional(),
+});
+
 export default function Goals() {
   const [goals, setGoals] = useState<any[]>([]);
+  const [open, setOpen] = useState(false);
+  const { toast } = useToast();
+  
+  const form = useForm({
+    resolver: zodResolver(createGoalSchema),
+    defaultValues: {
+      name: "",
+      target_amount: 0,
+      current_amount: 0,
+      deadline: "",
+    },
+  });
 
   useEffect(() => {
     fetchGoals();
@@ -40,11 +67,106 @@ export default function Goals() {
       setGoals([]);
     }
   };
+
+  const onSubmit = async (values: z.infer<typeof createGoalSchema>) => {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return;
+
+    const { error } = await supabase.from("savings_goals").insert({
+      user_id: user.id,
+      name: values.name,
+      target_amount: values.target_amount,
+      current_amount: values.current_amount,
+      deadline: values.deadline || null,
+    });
+
+    if (error) {
+      toast({ title: "Error", description: error.message, variant: "destructive" });
+    } else {
+      toast({ title: "Success", description: "Savings goal created successfully" });
+      setOpen(false);
+      form.reset();
+      fetchGoals();
+    }
+  };
+
   return (
     <div className="space-y-6">
-      <h1 className="text-3xl font-bold bg-gradient-to-r from-primary to-secondary bg-clip-text text-transparent">
-        Savings Goals
-      </h1>
+      <div className="flex justify-between items-center">
+        <h1 className="text-3xl font-bold bg-gradient-to-r from-primary to-secondary bg-clip-text text-transparent">
+          Savings Goals
+        </h1>
+        <Dialog open={open} onOpenChange={setOpen}>
+          <DialogTrigger asChild>
+            <Button>
+              <Plus className="mr-2 h-4 w-4" />
+              Add Goal
+            </Button>
+          </DialogTrigger>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Create Savings Goal</DialogTitle>
+            </DialogHeader>
+            <Form {...form}>
+              <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+                <FormField
+                  control={form.control}
+                  name="name"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Goal Name</FormLabel>
+                      <FormControl>
+                        <Input placeholder="e.g., Emergency Fund" {...field} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={form.control}
+                  name="target_amount"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Target Amount (₹)</FormLabel>
+                      <FormControl>
+                        <Input type="number" step="0.01" {...field} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={form.control}
+                  name="current_amount"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Current Amount (₹)</FormLabel>
+                      <FormControl>
+                        <Input type="number" step="0.01" {...field} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={form.control}
+                  name="deadline"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Deadline (Optional)</FormLabel>
+                      <FormControl>
+                        <Input type="date" {...field} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <Button type="submit" className="w-full">Create Goal</Button>
+              </form>
+            </Form>
+          </DialogContent>
+        </Dialog>
+      </div>
 
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
         {goals.map((goal) => {
