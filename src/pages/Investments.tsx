@@ -37,6 +37,9 @@ const createInvestmentSchema = z.object({
 export default function Investments() {
   const [investments, setInvestments] = useState<any[]>([]);
   const [open, setOpen] = useState(false);
+  const [recommendationsOpen, setRecommendationsOpen] = useState(false);
+  const [recommendations, setRecommendations] = useState<any>(null);
+  const [loading, setLoading] = useState(false);
   const { toast } = useToast();
   
   const form = useForm({
@@ -72,23 +75,42 @@ export default function Investments() {
     }
   };
   const getRecommendations = async () => {
-    const { data: { session } } = await supabase.auth.getSession();
-    if (!session) return;
-
-    const response = await fetch(
-      `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/investment-recommendations`,
-      {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${session.access_token}`,
-        },
-        body: JSON.stringify({ riskProfile: "moderate", investmentAmount: 10000 }),
+    setLoading(true);
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) {
+        toast({ title: "Error", description: "Please sign in to get recommendations", variant: "destructive" });
+        return;
       }
-    );
 
-    const data = await response.json();
-    // Display recommendations in UI instead of logging
+      const response = await fetch(
+        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/investment-recommendations`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${session.access_token}`,
+          },
+          body: JSON.stringify({ riskProfile: "moderate", investmentAmount: 10000 }),
+        }
+      );
+
+      if (!response.ok) {
+        throw new Error("Failed to fetch recommendations");
+      }
+
+      const data = await response.json();
+      setRecommendations(data);
+      setRecommendationsOpen(true);
+    } catch (error) {
+      toast({ 
+        title: "Error", 
+        description: "Failed to get AI recommendations. Please try again.", 
+        variant: "destructive" 
+      });
+    } finally {
+      setLoading(false);
+    }
   };
 
   const onSubmit = async (values: z.infer<typeof createInvestmentSchema>) => {
@@ -219,9 +241,9 @@ export default function Investments() {
               </Form>
             </DialogContent>
           </Dialog>
-          <Button onClick={getRecommendations} variant="outline">
+          <Button onClick={getRecommendations} variant="outline" disabled={loading}>
             <TrendingUp className="mr-2 h-4 w-4" />
-            Get AI Recommendations
+            {loading ? "Loading..." : "Get AI Recommendations"}
           </Button>
         </div>
       </div>
@@ -240,6 +262,61 @@ export default function Investments() {
           </Card>
         ))}
       </div>
+
+      <Dialog open={recommendationsOpen} onOpenChange={setRecommendationsOpen}>
+        <DialogContent className="max-w-4xl max-h-[80vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>AI Investment Recommendations</DialogTitle>
+          </DialogHeader>
+          {recommendations && (
+            <div className="space-y-6">
+              <div className="p-4 bg-warning/10 border border-warning/20 rounded-lg">
+                <p className="text-sm text-warning-foreground">{recommendations.disclaimer}</p>
+              </div>
+
+              <div>
+                <h3 className="text-lg font-semibold mb-4">Recommended Portfolio</h3>
+                <div className="space-y-4">
+                  {recommendations.recommendations?.map((rec: any, index: number) => (
+                    <Card key={index} className="p-4">
+                      <div className="flex justify-between items-start mb-2">
+                        <div>
+                          <h4 className="font-semibold">{rec.name}</h4>
+                          <p className="text-sm text-muted-foreground">{rec.type} - {rec.sector}</p>
+                        </div>
+                        <div className="text-right">
+                          <div className="text-2xl font-bold">{rec.allocation}%</div>
+                          <div className="text-sm text-muted-foreground">
+                            ₹{((rec.allocation / 100) * 10000).toLocaleString()}
+                          </div>
+                        </div>
+                      </div>
+                      <div className="grid grid-cols-2 gap-4 mt-3 pt-3 border-t">
+                        <div>
+                          <p className="text-xs text-muted-foreground">Risk Level</p>
+                          <p className="font-medium capitalize">{rec.risk}</p>
+                        </div>
+                        <div>
+                          <p className="text-xs text-muted-foreground">Expected Return</p>
+                          <p className="font-medium">{rec.expectedReturn}</p>
+                        </div>
+                      </div>
+                      <p className="text-sm mt-3">{rec.rationale}</p>
+                    </Card>
+                  ))}
+                </div>
+              </div>
+
+              {recommendations.summary && (
+                <div className="p-4 bg-muted rounded-lg">
+                  <h3 className="font-semibold mb-2">Portfolio Summary</h3>
+                  <p className="text-sm">{recommendations.summary}</p>
+                </div>
+              )}
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
