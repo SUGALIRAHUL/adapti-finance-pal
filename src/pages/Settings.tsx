@@ -21,60 +21,45 @@ export default function Settings() {
     const { data: { session } } = await supabase.auth.getSession();
     if (!session) return;
 
-    const response = await fetch(
-      `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/mfa-setup`,
-      {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${session.access_token}`,
-        },
-        body: JSON.stringify({ action: "check" }),
-      }
-    );
-
-    const data = await response.json();
-    setMfaEnabled(data.enabled);
+    const { data, error } = await supabase.functions.invoke('mfa-setup', {
+      body: { action: 'check' }
+    });
+    if (error) {
+      console.error('MFA check error:', error);
+      return;
+    }
+    setMfaEnabled(Boolean((data as any)?.enabled));
   };
 
   const setupMFA = async () => {
     const { data: { session } } = await supabase.auth.getSession();
     if (!session) return;
 
-    const response = await fetch(
-      `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/mfa-setup`,
-      {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${session.access_token}`,
-        },
-        body: JSON.stringify({ action: "setup" }),
-      }
-    );
-
-    const data = await response.json();
-    setQrCode(data.qrCodeUrl);
+    const { data, error } = await supabase.functions.invoke('mfa-setup', {
+      body: { action: 'setup' }
+    });
+    if (error) {
+      console.error('MFA setup error:', error);
+      toast({ variant: "destructive", title: "Failed to setup MFA" });
+      return;
+    }
+    setQrCode(((data as any)?.qrCodeUrl || (data as any)?.qr_code_url || '') as string);
   };
 
   const verifyMFA = async () => {
     const { data: { session } } = await supabase.auth.getSession();
     if (!session) return;
 
-    const response = await fetch(
-      `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/mfa-setup`,
-      {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${session.access_token}`,
-        },
-        body: JSON.stringify({ action: "verify", token: verifyToken }),
-      }
-    );
+    const { data, error } = await supabase.functions.invoke('mfa-setup', {
+      body: { action: 'verify', token: verifyToken }
+    });
+    if (error) {
+      console.error('MFA verify error:', error);
+      toast({ variant: "destructive", title: "Verification failed" });
+      return;
+    }
 
-    const data = await response.json();
-    if (data.valid) {
+    if ((data as any)?.valid) {
       toast({ title: "MFA enabled successfully!" });
       setMfaEnabled(true);
       setQrCode("");
