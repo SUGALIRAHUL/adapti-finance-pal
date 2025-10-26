@@ -22,7 +22,35 @@ const signupSchema = z.object({
     .trim()
     .min(1, 'Name required')
     .max(100, 'Name too long')
-    .regex(/^[a-zA-Z\s\-']+$/, 'Name contains invalid characters')
+    .regex(/^[a-zA-Z\s\-']+$/, 'Name contains invalid characters'),
+  displayName: z.string()
+    .trim()
+    .min(1, 'Display name required')
+    .max(50, 'Display name too long'),
+  mobileNumber: z.string()
+    .trim()
+    .regex(/^\+?[1-9]\d{1,14}$/, 'Invalid mobile number format'),
+  profession: z.string()
+    .trim()
+    .min(1, 'Profession required')
+    .max(100, 'Profession too long'),
+  city: z.string()
+    .trim()
+    .min(1, 'City required')
+    .max(100, 'City too long'),
+  country: z.string()
+    .trim()
+    .min(1, 'Country required')
+    .max(100, 'Country too long'),
+  dateOfBirth: z.string()
+    .refine((date) => {
+      const d = new Date(date);
+      return d instanceof Date && !isNaN(d.getTime());
+    }, 'Invalid date'),
+  bio: z.string()
+    .trim()
+    .max(500, 'Bio too long')
+    .optional()
 });
 
 const loginSchema = z.object({
@@ -36,6 +64,13 @@ export default function Auth() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [fullName, setFullName] = useState("");
+  const [displayName, setDisplayName] = useState("");
+  const [mobileNumber, setMobileNumber] = useState("");
+  const [profession, setProfession] = useState("");
+  const [city, setCity] = useState("");
+  const [country, setCountry] = useState("");
+  const [dateOfBirth, setDateOfBirth] = useState("");
+  const [bio, setBio] = useState("");
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -79,7 +114,18 @@ export default function Auth() {
     e.preventDefault();
     
     // Validate inputs
-    const validation = signupSchema.safeParse({ email, password, fullName });
+    const validation = signupSchema.safeParse({ 
+      email, 
+      password, 
+      fullName,
+      displayName,
+      mobileNumber,
+      profession,
+      city,
+      country,
+      dateOfBirth,
+      bio
+    });
     if (!validation.success) {
       toast({
         variant: "destructive",
@@ -98,6 +144,13 @@ export default function Auth() {
         emailRedirectTo: `${window.location.origin}/dashboard`,
         data: {
           full_name: validation.data.fullName,
+          display_name: validation.data.displayName,
+          mobile_number: validation.data.mobileNumber,
+          profession: validation.data.profession,
+          city: validation.data.city,
+          country: validation.data.country,
+          date_of_birth: validation.data.dateOfBirth,
+          bio: validation.data.bio,
         },
       },
     });
@@ -119,13 +172,10 @@ export default function Auth() {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-primary/20 via-background to-secondary/20 p-4">
-      <Card className="w-full max-w-md shadow-2xl border-0">
+    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-primary/20 via-accent/10 to-secondary/20 p-4">
+      <Card className="w-full max-w-2xl shadow-2xl border-0">
         <CardHeader className="space-y-4">
-          <div className="flex justify-center">
-            <img src={logo} alt="Finance Tutor" className="h-24 w-auto" />
-          </div>
-          <CardTitle className="text-3xl text-center bg-gradient-to-r from-primary to-secondary bg-clip-text text-transparent">
+          <CardTitle className="text-4xl text-center bg-gradient-to-r from-primary via-accent to-secondary bg-clip-text text-transparent font-bold">
             AI Finance Tutor
           </CardTitle>
           <CardDescription className="text-center text-base">
@@ -169,16 +219,29 @@ export default function Auth() {
             </TabsContent>
             <TabsContent value="signup">
               <form onSubmit={handleSignup} className="space-y-4">
-                <div className="space-y-2">
-                  <Label htmlFor="signup-name">Full Name</Label>
-                  <Input
-                    id="signup-name"
-                    type="text"
-                    placeholder="John Doe"
-                    value={fullName}
-                    onChange={(e) => setFullName(e.target.value)}
-                    required
-                  />
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="signup-name">Full Name</Label>
+                    <Input
+                      id="signup-name"
+                      type="text"
+                      placeholder="John Doe"
+                      value={fullName}
+                      onChange={(e) => setFullName(e.target.value)}
+                      required
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="signup-display-name">Display Name</Label>
+                    <Input
+                      id="signup-display-name"
+                      type="text"
+                      placeholder="Johnny"
+                      value={displayName}
+                      onChange={(e) => setDisplayName(e.target.value)}
+                      required
+                    />
+                  </div>
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="signup-email">Email</Label>
@@ -200,7 +263,75 @@ export default function Auth() {
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
                     required
-                    minLength={6}
+                    minLength={12}
+                  />
+                </div>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="signup-mobile">Mobile Number</Label>
+                    <Input
+                      id="signup-mobile"
+                      type="tel"
+                      placeholder="+1234567890"
+                      value={mobileNumber}
+                      onChange={(e) => setMobileNumber(e.target.value)}
+                      required
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="signup-dob">Date of Birth</Label>
+                    <Input
+                      id="signup-dob"
+                      type="date"
+                      value={dateOfBirth}
+                      onChange={(e) => setDateOfBirth(e.target.value)}
+                      required
+                    />
+                  </div>
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="signup-profession">Profession</Label>
+                  <Input
+                    id="signup-profession"
+                    type="text"
+                    placeholder="Software Engineer"
+                    value={profession}
+                    onChange={(e) => setProfession(e.target.value)}
+                    required
+                  />
+                </div>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="signup-city">City</Label>
+                    <Input
+                      id="signup-city"
+                      type="text"
+                      placeholder="New York"
+                      value={city}
+                      onChange={(e) => setCity(e.target.value)}
+                      required
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="signup-country">Country</Label>
+                    <Input
+                      id="signup-country"
+                      type="text"
+                      placeholder="USA"
+                      value={country}
+                      onChange={(e) => setCountry(e.target.value)}
+                      required
+                    />
+                  </div>
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="signup-bio">Bio (Optional)</Label>
+                  <Input
+                    id="signup-bio"
+                    type="text"
+                    placeholder="Tell us about yourself..."
+                    value={bio}
+                    onChange={(e) => setBio(e.target.value)}
                   />
                 </div>
                 <Button type="submit" className="w-full" disabled={loading}>

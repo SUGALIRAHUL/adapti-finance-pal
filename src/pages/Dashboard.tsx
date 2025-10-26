@@ -5,18 +5,42 @@ import { Wallet, TrendingUp, Target, BarChart3 } from "lucide-react";
 import { RadialProgress } from "@/components/RadialProgress";
 import { toast } from "@/hooks/use-toast";
 
+interface Stats {
+  totalBudget: number;
+  totalExpenses: number;
+  totalInvestments: number;
+  goalsProgress: number;
+}
+
 export default function Dashboard() {
-  const [stats, setStats] = useState({
+  const [stats, setStats] = useState<Stats>({
     totalBudget: 0,
     totalExpenses: 0,
     totalInvestments: 0,
     goalsProgress: 0,
   });
   const [loading, setLoading] = useState(true);
+  const [displayName, setDisplayName] = useState<string>("User");
 
   useEffect(() => {
     fetchStats();
+    fetchProfile();
   }, []);
+
+  const fetchProfile = async () => {
+    const { data: { session } } = await supabase.auth.getSession();
+    if (!session) return;
+
+    const { data } = await supabase
+      .from('profiles')
+      .select('display_name')
+      .eq('id', session.user.id)
+      .single();
+
+    if (data?.display_name) {
+      setDisplayName(data.display_name);
+    }
+  };
 
   const fetchStats = async () => {
     try {
@@ -86,11 +110,11 @@ export default function Dashboard() {
   return (
     <div className="space-y-6 animate-in fade-in-50 duration-500">
       <div>
-        <h1 className="text-3xl font-bold bg-gradient-to-r from-primary to-secondary bg-clip-text text-transparent">
-          Welcome to Your Finance Dashboard
+        <h1 className="text-4xl font-bold bg-gradient-to-r from-primary via-accent to-secondary bg-clip-text text-transparent">
+          Welcome {displayName}!
         </h1>
-        <p className="text-muted-foreground mt-2">
-          Track your financial journey with AI-powered insights
+        <p className="text-muted-foreground mt-2 text-lg">
+          Here's your financial overview
         </p>
       </div>
 
