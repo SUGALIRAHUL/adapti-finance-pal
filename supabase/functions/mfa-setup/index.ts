@@ -12,18 +12,41 @@ function hexToBuffer(hex: string): ArrayBuffer {
 }
 
 async function getEncryptionKey(): Promise<CryptoKey> {
-  const keyMaterial = Deno.env.get('MFA_ENCRYPTION_KEY');
+  let keyMaterial = Deno.env.get('MFA_ENCRYPTION_KEY')?.trim();
   
   if (!keyMaterial) {
     throw new Error('MFA_ENCRYPTION_KEY environment variable must be configured. Generate a secure key using: openssl rand -hex 32');
   }
   
-  // Require 64-character hex string (32 bytes = 256 bits)
-  if (!/^[0-9a-f]{64}$/i.test(keyMaterial)) {
-    throw new Error('MFA_ENCRYPTION_KEY must be a 64-character hexadecimal string (256-bit key). Generate using: openssl rand -hex 32');
+  // Allow either 64-char hex or base64-encoded 32-byte key. Optional prefixes: hex:, base64:
+  if (keyMaterial.toLowerCase().startsWith('hex:')) {
+    keyMaterial = keyMaterial.slice(4).trim();
   }
-  
-  const keyData = hexToBuffer(keyMaterial);
+
+  let keyData: ArrayBuffer | null = null;
+
+  // Try hex first
+  if (/^[0-9a-f]{64}$/i.test(keyMaterial)) {
+    keyData = hexToBuffer(keyMaterial);
+  } else {
+    // Try base64 (optionally prefixed with base64:)
+    try {
+      const cleaned = keyMaterial.toLowerCase().startsWith('base64:')
+        ? keyMaterial.slice(7).trim()
+        : keyMaterial;
+      const bytes = Uint8Array.from(atob(cleaned), c => c.charCodeAt(0));
+      if (bytes.byteLength !== 32) {
+        throw new Error('Base64 key must decode to exactly 32 bytes');
+      }
+      keyData = bytes.buffer;
+    } catch {
+      keyData = null;
+    }
+  }
+
+  if (!keyData) {
+    throw new Error('MFA_ENCRYPTION_KEY must be a 64-character hex string (openssl rand -hex 32) or a base64-encoded 32-byte value.');
+  }
   
   return await crypto.subtle.importKey(
     'raw',
