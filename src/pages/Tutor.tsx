@@ -7,6 +7,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { Send, Bot, User } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
 import { FormattedMessage } from "@/components/FormattedMessage";
+import DOMPurify from 'dompurify';
 
 type Message = {
   role: "user" | "assistant";
@@ -31,7 +32,13 @@ export default function Tutor() {
   const sendMessage = async () => {
     if (!input.trim() || loading) return;
 
-    const userMessage: Message = { role: "user", content: input };
+    // Sanitize user input to prevent injection attacks
+    const sanitizedInput = DOMPurify.sanitize(input, { 
+      ALLOWED_TAGS: [],
+      KEEP_CONTENT: true 
+    });
+    
+    const userMessage: Message = { role: "user", content: sanitizedInput };
     setMessages((prev) => [...prev, userMessage]);
     setInput("");
     setLoading(true);

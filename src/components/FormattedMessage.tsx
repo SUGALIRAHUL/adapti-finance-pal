@@ -1,10 +1,18 @@
+import DOMPurify from 'dompurify';
+
 type FormattedMessageProps = {
   content: string;
 };
 
 export function FormattedMessage({ content }: FormattedMessageProps) {
+  // Sanitize content to prevent XSS attacks
+  const sanitizedContent = DOMPurify.sanitize(content, { 
+    ALLOWED_TAGS: [], // Strip all HTML tags, keep only text
+    KEEP_CONTENT: true // Keep the text content
+  });
+  
   // Split content into lines
-  const lines = content.split('\n');
+  const lines = sanitizedContent.split('\n');
   
   return (
     <div className="space-y-3">
