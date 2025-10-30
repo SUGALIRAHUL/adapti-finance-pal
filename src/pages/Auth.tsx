@@ -216,7 +216,7 @@ export default function Auth() {
             <UserCircle className="h-24 w-24 text-primary" />
           </div>
           <CardTitle className="text-4xl text-center bg-gradient-to-r from-primary via-accent to-secondary bg-clip-text text-transparent font-bold">
-            AI Finance Tutor
+            PERSFIN
           </CardTitle>
           <CardDescription className="text-center text-base">
             Your personal finance planning companion powered by AI
