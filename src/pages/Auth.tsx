@@ -109,10 +109,11 @@ export default function Auth() {
     });
 
     if (error) {
+      console.error('Auth error:', error.code, error.message);
       toast({
         variant: "destructive",
-        title: "Login failed",
-        description: error.message,
+        title: "Authentication failed",
+        description: "Invalid email or password. Please try again.",
       });
     } else {
       toast({
@@ -171,10 +172,11 @@ export default function Auth() {
     });
 
     if (error) {
+      console.error('Signup error:', error.code, error.message);
       toast({
         variant: "destructive",
-        title: "Signup failed",
-        description: error.message,
+        title: "Account creation failed",
+        description: "Unable to create account. Please try again or contact support.",
       });
     } else {
       toast({
@@ -205,18 +207,15 @@ export default function Auth() {
     });
 
     if (error) {
-      toast({
-        variant: "destructive",
-        title: "Password reset failed",
-        description: error.message,
-      });
-    } else {
-      setResetSent(true);
-      toast({
-        title: "Check your email",
-        description: "We've sent you a password reset link. Please check your inbox.",
-      });
+      console.error('Password reset error:', error.code, error.message);
     }
+    
+    // Always show success message to prevent email enumeration
+    setResetSent(true);
+    toast({
+      title: "Check your email",
+      description: "If an account exists with this email, you will receive a password reset link.",
+    });
 
     setLoading(false);
   };
@@ -233,11 +232,13 @@ export default function Auth() {
       return;
     }
 
-    if (newPassword.length < 6) {
+    // Apply same strong password validation as signup
+    const passwordValidation = signupSchema.shape.password.safeParse(newPassword);
+    if (!passwordValidation.success) {
       toast({
         variant: "destructive",
-        title: "Error",
-        description: "Password must be at least 6 characters",
+        title: "Weak Password",
+        description: passwordValidation.error.errors[0].message,
       });
       return;
     }
@@ -249,14 +250,17 @@ export default function Auth() {
         password: newPassword,
       });
 
-      if (error) throw error;
+      if (error) {
+        console.error('Password update error:', error.code, error.message);
+        throw error;
+      }
 
       toast({
         title: "Success",
         description: "Your password has been updated successfully!",
       });
 
-      // Clear the hash and redirect to login
+      // Clear the hash and redirect to dashboard
       window.location.hash = '';
       setIsPasswordReset(false);
       setNewPassword("");
@@ -265,8 +269,8 @@ export default function Auth() {
     } catch (error: any) {
       toast({
         variant: "destructive",
-        title: "Error",
-        description: error.message,
+        title: "Password Update Failed",
+        description: "Unable to update your password. Please try again or request a new reset link.",
       });
     } finally {
       setLoading(false);
@@ -296,12 +300,15 @@ export default function Auth() {
                 <Input
                   id="new-password"
                   type="password"
-                  placeholder="Enter new password"
+                  placeholder="Min. 12 characters, uppercase, lowercase, number, special char"
                   value={newPassword}
                   onChange={(e) => setNewPassword(e.target.value)}
                   required
-                  minLength={6}
+                  minLength={12}
                 />
+                <p className="text-xs text-muted-foreground">
+                  Password must be at least 12 characters and contain uppercase, lowercase, number, and special character
+                </p>
               </div>
               <div className="space-y-2">
                 <Label htmlFor="confirm-password">Confirm Password</Label>
@@ -312,7 +319,7 @@ export default function Auth() {
                   value={confirmPassword}
                   onChange={(e) => setConfirmPassword(e.target.value)}
                   required
-                  minLength={6}
+                  minLength={12}
                 />
               </div>
               <Button type="submit" className="w-full" disabled={loading}>
