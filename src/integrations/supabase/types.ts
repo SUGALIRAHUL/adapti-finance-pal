@@ -137,6 +137,7 @@ export type Database = {
           knowledge_level: string | null
           mobile_number: string | null
           profession: string | null
+          recovery_email: string | null
           updated_at: string | null
         }
         Insert: {
@@ -153,6 +154,7 @@ export type Database = {
           knowledge_level?: string | null
           mobile_number?: string | null
           profession?: string | null
+          recovery_email?: string | null
           updated_at?: string | null
         }
         Update: {
@@ -169,6 +171,7 @@ export type Database = {
           knowledge_level?: string | null
           mobile_number?: string | null
           profession?: string | null
+          recovery_email?: string | null
           updated_at?: string | null
         }
         Relationships: []
