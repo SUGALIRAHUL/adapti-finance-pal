@@ -185,18 +185,16 @@ export default function Settings() {
       redirectTo: `${window.location.origin}/auth`,
     });
 
+    // Log error for debugging but don't expose details to user
     if (error) {
-      toast({
-        variant: "destructive",
-        title: "Password reset failed",
-        description: error.message,
-      });
-    } else {
-      toast({
-        title: "Check your email",
-        description: "We've sent you a password reset link",
-      });
+      console.error('Password reset error:', error.code, error.message);
     }
+
+    // Always show generic success message to prevent account enumeration
+    toast({
+      title: "Password reset requested",
+      description: "If an account exists with this email, you'll receive a password reset link.",
+    });
   };
 
   return (
