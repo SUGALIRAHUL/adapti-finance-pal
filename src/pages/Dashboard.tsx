@@ -1,6 +1,8 @@
 import { useEffect, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
 import { Wallet, TrendingUp, Target, BarChart3 } from "lucide-react";
 import { RadialProgress } from "@/components/RadialProgress";
 import { toast } from "@/hooks/use-toast";
@@ -21,6 +23,8 @@ export default function Dashboard() {
   });
   const [loading, setLoading] = useState(true);
   const [displayName, setDisplayName] = useState<string>("User");
+  const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
+  const navigate = useNavigate();
 
   useEffect(() => {
     fetchStats();
@@ -33,12 +37,15 @@ export default function Dashboard() {
 
     const { data } = await supabase
       .from('profiles')
-      .select('display_name')
+      .select('display_name, avatar_url')
       .eq('id', session.user.id)
       .single();
 
     if (data?.display_name) {
       setDisplayName(data.display_name);
+    }
+    if (data?.avatar_url) {
+      setAvatarUrl(data.avatar_url);
     }
   };
 
@@ -109,13 +116,24 @@ export default function Dashboard() {
 
   return (
     <div className="space-y-6 animate-in fade-in-50 duration-500">
-      <div>
-        <h1 className="text-4xl font-bold bg-gradient-to-r from-primary via-accent to-secondary bg-clip-text text-transparent">
-          Welcome {displayName}!
-        </h1>
-        <p className="text-muted-foreground mt-2 text-lg">
-          Here's your financial overview
-        </p>
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-4xl font-bold bg-gradient-to-r from-primary via-accent to-secondary bg-clip-text text-transparent">
+            Welcome {displayName}!
+          </h1>
+          <p className="text-muted-foreground mt-2 text-lg">
+            Here's your financial overview
+          </p>
+        </div>
+        <Avatar 
+          className="h-16 w-16 cursor-pointer hover:ring-2 hover:ring-primary transition-all"
+          onClick={() => navigate('/settings')}
+        >
+          <AvatarImage src={avatarUrl || undefined} alt={displayName} />
+          <AvatarFallback className="bg-primary text-primary-foreground text-xl">
+            {displayName.charAt(0).toUpperCase()}
+          </AvatarFallback>
+        </Avatar>
       </div>
 
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
