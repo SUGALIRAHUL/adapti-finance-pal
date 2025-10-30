@@ -9,7 +9,7 @@ import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "
 import { Input } from "@/components/ui/input";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { Plus } from "lucide-react";
+import { Plus, Trash2 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 
 const goalSchema = z
@@ -86,6 +86,21 @@ export default function Goals() {
       toast({ title: "Success", description: "Savings goal created successfully" });
       setOpen(false);
       form.reset();
+      fetchGoals();
+    }
+  };
+
+  const handleDelete = async (id: string) => {
+    const { error } = await supabase.from("savings_goals").delete().eq("id", id);
+    
+    if (error) {
+      toast({ 
+        title: "Error", 
+        description: "Failed to delete goal", 
+        variant: "destructive" 
+      });
+    } else {
+      toast({ title: "Success", description: "Goal deleted successfully" });
       fetchGoals();
     }
   };
@@ -175,7 +190,17 @@ export default function Goals() {
           const progress = target > 0 ? Math.min(100, (current / target) * 100) : 0;
           return (
             <Card key={goal.id}>
-              <CardHeader><CardTitle>{goal.name}</CardTitle></CardHeader>
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <CardTitle>{goal.name}</CardTitle>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  onClick={() => handleDelete(goal.id)}
+                  className="text-destructive hover:text-destructive"
+                >
+                  <Trash2 className="h-4 w-4" />
+                </Button>
+              </CardHeader>
               <CardContent className="flex flex-col items-center space-y-4">
                 <RadialProgress value={progress} size={120} />
                 <div className="text-center">

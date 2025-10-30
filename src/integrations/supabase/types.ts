@@ -122,30 +122,6 @@ export type Database = {
         }
         Relationships: []
       }
-      mfa_secrets: {
-        Row: {
-          created_at: string | null
-          enabled: boolean | null
-          id: string
-          secret: string
-          user_id: string
-        }
-        Insert: {
-          created_at?: string | null
-          enabled?: boolean | null
-          id?: string
-          secret: string
-          user_id: string
-        }
-        Update: {
-          created_at?: string | null
-          enabled?: boolean | null
-          id?: string
-          secret?: string
-          user_id?: string
-        }
-        Relationships: []
-      }
       profiles: {
         Row: {
           avatar_url: string | null

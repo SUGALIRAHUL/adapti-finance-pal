@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
-import { Plus } from "lucide-react";
+import { Plus, Trash2 } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
 import { z } from "zod";
 
@@ -90,6 +90,21 @@ export default function Expenses() {
     }
   };
 
+  const handleDelete = async (id: string) => {
+    const { error } = await supabase.from("expenses").delete().eq("id", id);
+    
+    if (error) {
+      toast({ 
+        variant: "destructive",
+        title: "Error",
+        description: "Failed to delete expense"
+      });
+    } else {
+      toast({ title: "Expense deleted" });
+      fetchExpenses();
+    }
+  };
+
   return (
     <div className="space-y-6">
       <div className="flex justify-between items-center">
@@ -122,7 +137,17 @@ export default function Expenses() {
                 <p className="text-sm text-muted-foreground">{expense.description}</p>
                 <p className="text-xs text-muted-foreground">{new Date(expense.date).toLocaleDateString()}</p>
               </div>
-              <div className="text-xl font-bold text-destructive">₹{Number(expense.amount).toFixed(2)}</div>
+              <div className="flex items-center gap-4">
+                <div className="text-xl font-bold text-destructive">₹{Number(expense.amount).toFixed(2)}</div>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  onClick={() => handleDelete(expense.id)}
+                  className="text-destructive hover:text-destructive"
+                >
+                  <Trash2 className="h-4 w-4" />
+                </Button>
+              </div>
             </CardContent>
           </Card>
         ))}

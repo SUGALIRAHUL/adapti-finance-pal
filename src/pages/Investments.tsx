@@ -3,7 +3,7 @@ import { z } from "zod";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { TrendingUp, Plus } from "lucide-react";
+import { TrendingUp, Plus, Trash2 } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
@@ -138,6 +138,21 @@ export default function Investments() {
     }
   };
 
+  const handleDelete = async (id: string) => {
+    const { error } = await supabase.from("investments").delete().eq("id", id);
+    
+    if (error) {
+      toast({ 
+        title: "Error", 
+        description: "Failed to delete investment", 
+        variant: "destructive" 
+      });
+    } else {
+      toast({ title: "Success", description: "Investment deleted successfully" });
+      fetchInvestments();
+    }
+  };
+
   return (
     <div className="space-y-6">
       <div className="flex justify-between items-center">
@@ -251,7 +266,17 @@ export default function Investments() {
       <div className="grid gap-4 md:grid-cols-2">
         {investments.map((inv) => (
           <Card key={inv.id}>
-            <CardHeader><CardTitle>{inv.name}</CardTitle></CardHeader>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle>{inv.name}</CardTitle>
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={() => handleDelete(inv.id)}
+                className="text-destructive hover:text-destructive"
+              >
+                <Trash2 className="h-4 w-4" />
+              </Button>
+            </CardHeader>
             <CardContent>
               <div className="space-y-2">
                 <p className="text-sm"><span className="font-semibold">Type:</span> {inv.type}</p>
