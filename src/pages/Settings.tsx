@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -7,31 +7,52 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { User } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
+import { useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { z } from "zod";
+import {
+  Form,
+  FormControl,
+  FormField,
+  FormItem,
+  FormLabel,
+  FormMessage,
+} from "@/components/ui/form";
 
-interface Profile {
-  full_name: string | null;
-  display_name: string | null;
-  email: string | null;
-  mobile_number: string | null;
-  profession: string | null;
-  city: string | null;
-  country: string | null;
-  date_of_birth: string | null;
-  bio: string | null;
-}
+const profileSchema = z.object({
+  full_name: z.string().trim().min(1, "Full name is required").max(100, "Full name must be less than 100 characters").regex(/^[a-zA-Z\s'-]+$/, "Full name can only contain letters, spaces, hyphens, and apostrophes"),
+  display_name: z.string().trim().min(1, "Display name is required").max(50, "Display name must be less than 50 characters"),
+  email: z.string().email(),
+  mobile_number: z.string().trim().regex(/^\+?[1-9]\d{1,14}$/, "Please enter a valid international phone number (e.g., +1234567890)").optional().or(z.literal("")),
+  profession: z.string().trim().max(100, "Profession must be less than 100 characters").optional().or(z.literal("")),
+  city: z.string().trim().max(100, "City must be less than 100 characters").optional().or(z.literal("")),
+  country: z.string().trim().max(100, "Country must be less than 100 characters").optional().or(z.literal("")),
+  date_of_birth: z.string().refine((date) => {
+    if (!date) return true;
+    const birthDate = new Date(date);
+    const today = new Date();
+    const age = today.getFullYear() - birthDate.getFullYear();
+    return birthDate < today && age >= 13 && age <= 120;
+  }, "Please enter a valid date of birth (age must be between 13 and 120)").optional().or(z.literal("")),
+  bio: z.string().trim().max(500, "Bio must be less than 500 characters").optional().or(z.literal("")),
+});
+
+type ProfileFormData = z.infer<typeof profileSchema>;
 
 export default function Settings() {
-  const [loading, setLoading] = useState(false);
-  const [profile, setProfile] = useState<Profile>({
-    full_name: "",
-    display_name: "",
-    email: "",
-    mobile_number: "",
-    profession: "",
-    city: "",
-    country: "",
-    date_of_birth: "",
-    bio: "",
+  const form = useForm<ProfileFormData>({
+    resolver: zodResolver(profileSchema),
+    defaultValues: {
+      full_name: "",
+      display_name: "",
+      email: "",
+      mobile_number: "",
+      profession: "",
+      city: "",
+      country: "",
+      date_of_birth: "",
+      bio: "",
+    },
   });
 
   useEffect(() => {
@@ -54,7 +75,7 @@ export default function Settings() {
     }
 
     if (data) {
-      setProfile({
+      form.reset({
         full_name: data.full_name || "",
         display_name: data.display_name || "",
         email: data.email || "",
@@ -68,22 +89,21 @@ export default function Settings() {
     }
   };
 
-  const updateProfile = async () => {
-    setLoading(true);
+  const onSubmit = async (values: ProfileFormData) => {
     const { data: { session } } = await supabase.auth.getSession();
     if (!session) return;
 
     const { error } = await supabase
       .from('profiles')
       .update({
-        full_name: profile.full_name,
-        display_name: profile.display_name,
-        mobile_number: profile.mobile_number,
-        profession: profile.profession,
-        city: profile.city,
-        country: profile.country,
-        date_of_birth: profile.date_of_birth,
-        bio: profile.bio,
+        full_name: values.full_name,
+        display_name: values.display_name,
+        mobile_number: values.mobile_number || null,
+        profession: values.profession || null,
+        city: values.city || null,
+        country: values.country || null,
+        date_of_birth: values.date_of_birth || null,
+        bio: values.bio || null,
       })
       .eq('id', session.user.id);
 
@@ -93,8 +113,6 @@ export default function Settings() {
     } else {
       toast({ title: "Profile updated successfully!" });
     }
-
-    setLoading(false);
   };
 
   return (
@@ -110,95 +128,143 @@ export default function Settings() {
             Your Profile
           </CardTitle>
         </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div className="space-y-2">
-              <Label>Full Name</Label>
-              <Input
-                value={profile.full_name || ""}
-                onChange={(e) => setProfile({ ...profile, full_name: e.target.value })}
-                placeholder="John Doe"
-              />
-            </div>
-            <div className="space-y-2">
-              <Label>Display Name</Label>
-              <Input
-                value={profile.display_name || ""}
-                onChange={(e) => setProfile({ ...profile, display_name: e.target.value })}
-                placeholder="Johnny"
-              />
-            </div>
-          </div>
+        <CardContent>
+          <Form {...form}>
+            <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <FormField
+                  control={form.control}
+                  name="full_name"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Full Name</FormLabel>
+                      <FormControl>
+                        <Input placeholder="John Doe" {...field} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={form.control}
+                  name="display_name"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Display Name</FormLabel>
+                      <FormControl>
+                        <Input placeholder="Johnny" {...field} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              </div>
 
-          <div className="space-y-2">
-            <Label>Email</Label>
-            <Input
-              value={profile.email || ""}
-              disabled
-              className="bg-muted"
-            />
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div className="space-y-2">
-              <Label>Mobile Number</Label>
-              <Input
-                value={profile.mobile_number || ""}
-                onChange={(e) => setProfile({ ...profile, mobile_number: e.target.value })}
-                placeholder="+1234567890"
+              <FormField
+                control={form.control}
+                name="email"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Email</FormLabel>
+                    <FormControl>
+                      <Input disabled className="bg-muted" {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
               />
-            </div>
-            <div className="space-y-2">
-              <Label>Date of Birth</Label>
-              <Input
-                type="date"
-                value={profile.date_of_birth || ""}
-                onChange={(e) => setProfile({ ...profile, date_of_birth: e.target.value })}
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <FormField
+                  control={form.control}
+                  name="mobile_number"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Mobile Number</FormLabel>
+                      <FormControl>
+                        <Input placeholder="+1234567890" {...field} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={form.control}
+                  name="date_of_birth"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Date of Birth</FormLabel>
+                      <FormControl>
+                        <Input type="date" {...field} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              </div>
+
+              <FormField
+                control={form.control}
+                name="profession"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Profession</FormLabel>
+                    <FormControl>
+                      <Input placeholder="Software Engineer" {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
               />
-            </div>
-          </div>
 
-          <div className="space-y-2">
-            <Label>Profession</Label>
-            <Input
-              value={profile.profession || ""}
-              onChange={(e) => setProfile({ ...profile, profession: e.target.value })}
-              placeholder="Software Engineer"
-            />
-          </div>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <FormField
+                  control={form.control}
+                  name="city"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>City</FormLabel>
+                      <FormControl>
+                        <Input placeholder="New York" {...field} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={form.control}
+                  name="country"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Country</FormLabel>
+                      <FormControl>
+                        <Input placeholder="USA" {...field} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div className="space-y-2">
-              <Label>City</Label>
-              <Input
-                value={profile.city || ""}
-                onChange={(e) => setProfile({ ...profile, city: e.target.value })}
-                placeholder="New York"
+              <FormField
+                control={form.control}
+                name="bio"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Bio</FormLabel>
+                    <FormControl>
+                      <Textarea placeholder="Tell us about yourself..." rows={4} {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
               />
-            </div>
-            <div className="space-y-2">
-              <Label>Country</Label>
-              <Input
-                value={profile.country || ""}
-                onChange={(e) => setProfile({ ...profile, country: e.target.value })}
-                placeholder="USA"
-              />
-            </div>
-          </div>
 
-          <div className="space-y-2">
-            <Label>Bio</Label>
-            <Textarea
-              value={profile.bio || ""}
-              onChange={(e) => setProfile({ ...profile, bio: e.target.value })}
-              placeholder="Tell us about yourself..."
-              rows={4}
-            />
-          </div>
-
-          <Button onClick={updateProfile} disabled={loading} className="w-full">
-            {loading ? "Updating..." : "Update Profile"}
-          </Button>
+              <Button type="submit" disabled={form.formState.isSubmitting} className="w-full">
+                {form.formState.isSubmitting ? "Updating..." : "Update Profile"}
+              </Button>
+            </form>
+          </Form>
         </CardContent>
       </Card>
     </div>
