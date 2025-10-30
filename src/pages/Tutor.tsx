@@ -6,6 +6,7 @@ import { Input } from "@/components/ui/input";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Send, Bot, User } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
+import { FormattedMessage } from "@/components/FormattedMessage";
 
 type Message = {
   role: "user" | "assistant";
@@ -141,13 +142,17 @@ export default function Tutor() {
                     </div>
                   )}
                   <div
-                    className={`max-w-[80%] rounded-lg p-3 ${
+                    className={`max-w-[80%] rounded-lg p-4 ${
                       message.role === "user"
                         ? "bg-primary text-primary-foreground"
                         : "bg-muted"
                     }`}
                   >
-                    {message.content}
+                    {message.role === "user" ? (
+                      <p className="whitespace-pre-wrap">{message.content}</p>
+                    ) : (
+                      <FormattedMessage content={message.content} />
+                    )}
                   </div>
                   {message.role === "user" && (
                     <div className="h-8 w-8 rounded-full bg-secondary/10 flex items-center justify-center flex-shrink-0">
