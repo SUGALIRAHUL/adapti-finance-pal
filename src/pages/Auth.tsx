@@ -7,9 +7,8 @@ import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { toast } from "@/hooks/use-toast";
-import logo from "@/assets/finance-tutor-logo.png";
 import { z } from "zod";
-import { Mail } from "lucide-react";
+import { Mail, UserCircle } from "lucide-react";
 
 const signupSchema = z.object({
   email: z.string().email('Invalid email address').max(255, 'Email too long'),
@@ -213,6 +212,9 @@ export default function Auth() {
     <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-primary/20 via-accent/10 to-secondary/20 p-4">
       <Card className="w-full max-w-2xl shadow-2xl border-0">
         <CardHeader className="space-y-4">
+          <div className="flex justify-center mb-2">
+            <UserCircle className="h-24 w-24 text-primary" />
+          </div>
           <CardTitle className="text-4xl text-center bg-gradient-to-r from-primary via-accent to-secondary bg-clip-text text-transparent font-bold">
             AI Finance Tutor
           </CardTitle>
