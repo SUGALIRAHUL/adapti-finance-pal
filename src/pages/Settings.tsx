@@ -19,6 +19,7 @@ import {
   FormMessage,
 } from "@/components/ui/form";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { CountryCodeSelector } from "@/components/CountryCodeSelector";
 
 const profileSchema = z.object({
   full_name: z.string().trim().min(1, "Full name is required").max(100, "Full name must be less than 100 characters").regex(/^[a-zA-Z\s'-]+$/, "Full name can only contain letters, spaces, hyphens, and apostrophes"),
@@ -352,12 +353,49 @@ export default function Settings() {
                   render={({ field }) => (
                     <FormItem>
                       <FormLabel>Mobile Number</FormLabel>
-                      <FormControl>
-                        <Input placeholder="+14155552671" {...field} />
-                      </FormControl>
+                      <div className="flex gap-2">
+                        <CountryCodeSelector
+                          value={field.value || ""}
+                          onSelect={(code) => {
+                            // Extract the number part (remove old country code if present)
+                            const currentValue = field.value || "";
+                            let numberPart = currentValue;
+                            
+                            // Remove existing country code if present
+                            if (currentValue.startsWith("+")) {
+                              // Find where the country code ends (first non-digit after +)
+                              const match = currentValue.match(/^\+\d+/);
+                              if (match) {
+                                numberPart = currentValue.substring(match[0].length);
+                              }
+                            }
+                            
+                            // Set new value with selected country code
+                            field.onChange(code + numberPart);
+                          }}
+                          disabled={form.formState.isSubmitting}
+                        />
+                        <FormControl>
+                          <Input 
+                            placeholder="4155552671" 
+                            {...field}
+                            value={field.value?.replace(/^\+\d+/, '') || ''}
+                            onChange={(e) => {
+                              // Get current country code
+                              const currentValue = field.value || "+1";
+                              const match = currentValue.match(/^\+\d+/);
+                              const countryCode = match ? match[0] : "+1";
+                              
+                              // Remove non-digits from input
+                              const digits = e.target.value.replace(/\D/g, '');
+                              field.onChange(countryCode + digits);
+                            }}
+                          />
+                        </FormControl>
+                      </div>
                       <FormMessage />
                       <p className="text-sm text-muted-foreground">
-                        Required for phone-based password reset. Format: +[country code][number] (e.g., +14155552671 for US)
+                        Required for phone-based password reset. Select country code and enter number.
                       </p>
                     </FormItem>
                   )}

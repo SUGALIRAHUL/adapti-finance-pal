@@ -9,6 +9,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { toast } from "@/hooks/use-toast";
 import { z } from "zod";
 import { Mail, UserCircle } from "lucide-react";
+import { CountryCodeSelector } from "@/components/CountryCodeSelector";
 
 
 const signupSchema = z.object({
@@ -66,7 +67,7 @@ export default function Auth() {
   const [password, setPassword] = useState("");
   const [fullName, setFullName] = useState("");
   const [displayName, setDisplayName] = useState("");
-  const [mobileNumber, setMobileNumber] = useState("");
+  const [mobileNumber, setMobileNumber] = useState("+1");
   const [profession, setProfession] = useState("");
   const [city, setCity] = useState("");
   const [country, setCountry] = useState("");
@@ -435,16 +436,41 @@ export default function Auth() {
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div className="space-y-2">
                     <Label htmlFor="signup-mobile">Mobile Number</Label>
-                    <Input
-                      id="signup-mobile"
-                      type="tel"
-                      placeholder="+14155552671"
-                      value={mobileNumber}
-                      onChange={(e) => setMobileNumber(e.target.value)}
-                      required
-                    />
+                    <div className="flex gap-2">
+                      <CountryCodeSelector
+                        value={mobileNumber}
+                        onSelect={(code) => {
+                          // Extract the number part (remove old country code if present)
+                          let numberPart = mobileNumber;
+                          
+                          if (mobileNumber.startsWith("+")) {
+                            const match = mobileNumber.match(/^\+\d+/);
+                            if (match) {
+                              numberPart = mobileNumber.substring(match[0].length);
+                            }
+                          }
+                          
+                          setMobileNumber(code + numberPart);
+                        }}
+                        disabled={loading}
+                      />
+                      <Input
+                        id="signup-mobile"
+                        type="tel"
+                        placeholder="4155552671"
+                        value={mobileNumber.replace(/^\+\d+/, '')}
+                        onChange={(e) => {
+                          const currentValue = mobileNumber || "+1";
+                          const match = currentValue.match(/^\+\d+/);
+                          const countryCode = match ? match[0] : "+1";
+                          const digits = e.target.value.replace(/\D/g, '');
+                          setMobileNumber(countryCode + digits);
+                        }}
+                        required
+                      />
+                    </div>
                     <p className="text-xs text-muted-foreground">
-                      Format: +[country code][number] (e.g., +14155552671 for US, +442071234567 for UK)
+                      Select your country code and enter your phone number
                     </p>
                   </div>
                   <div className="space-y-2">
