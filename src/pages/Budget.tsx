@@ -6,7 +6,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
-import { Plus, Trash2 } from "lucide-react";
+import { Plus, Trash2, Pencil } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
 import { z } from "zod";
 
@@ -35,6 +35,7 @@ export default function Budget() {
   const [budgets, setBudgets] = useState<Budget[]>([]);
   const [loading, setLoading] = useState(true);
   const [dialogOpen, setDialogOpen] = useState(false);
+  const [editingId, setEditingId] = useState<string | null>(null);
   const [formData, setFormData] = useState({
     category: "",
     amount: "",
@@ -94,22 +95,39 @@ export default function Budget() {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return;
 
-      const { error } = await supabase.from("budgets").insert({
-        user_id: user.id,
-        category: validation.data.category,
-        amount: validation.data.amount,
-        period: validation.data.period,
-        start_date: validation.data.start_date,
-      });
+      if (editingId) {
+        const { error } = await supabase.from("budgets").update({
+          category: validation.data.category,
+          amount: validation.data.amount,
+          period: validation.data.period,
+          start_date: validation.data.start_date,
+        }).eq("id", editingId);
 
-      if (error) throw error;
+        if (error) throw error;
 
-      toast({
-        title: "Success",
-        description: "Budget added successfully",
-      });
+        toast({
+          title: "Success",
+          description: "Budget updated successfully",
+        });
+      } else {
+        const { error } = await supabase.from("budgets").insert({
+          user_id: user.id,
+          category: validation.data.category,
+          amount: validation.data.amount,
+          period: validation.data.period,
+          start_date: validation.data.start_date,
+        });
+
+        if (error) throw error;
+
+        toast({
+          title: "Success",
+          description: "Budget added successfully",
+        });
+      }
 
       setDialogOpen(false);
+      setEditingId(null);
       setFormData({
         category: "",
         amount: "",
@@ -121,9 +139,20 @@ export default function Budget() {
       toast({
         variant: "destructive",
         title: "Error",
-        description: "Failed to add budget",
+        description: editingId ? "Failed to update budget" : "Failed to add budget",
       });
     }
+  };
+
+  const handleEdit = (budget: Budget) => {
+    setEditingId(budget.id);
+    setFormData({
+      category: budget.category,
+      amount: budget.amount.toString(),
+      period: budget.period,
+      start_date: budget.start_date,
+    });
+    setDialogOpen(true);
   };
 
   const handleDelete = async (id: string) => {
@@ -151,7 +180,18 @@ export default function Budget() {
         <h1 className="text-3xl font-bold bg-gradient-to-r from-primary to-secondary bg-clip-text text-transparent">
           Budget Planner
         </h1>
-        <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
+        <Dialog open={dialogOpen} onOpenChange={(open) => {
+          setDialogOpen(open);
+          if (!open) {
+            setEditingId(null);
+            setFormData({
+              category: "",
+              amount: "",
+              period: "monthly",
+              start_date: new Date().toISOString().split("T")[0],
+            });
+          }
+        }}>
           <DialogTrigger asChild>
             <Button>
               <Plus className="mr-2 h-4 w-4" />
@@ -160,7 +200,7 @@ export default function Budget() {
           </DialogTrigger>
           <DialogContent>
             <DialogHeader>
-              <DialogTitle>Add New Budget</DialogTitle>
+              <DialogTitle>{editingId ? "Edit Budget" : "Add New Budget"}</DialogTitle>
             </DialogHeader>
             <form onSubmit={handleSubmit} className="space-y-4">
               <div className="space-y-2">
@@ -209,7 +249,7 @@ export default function Budget() {
                 />
               </div>
               <Button type="submit" className="w-full">
-                Add Budget
+                {editingId ? "Update Budget" : "Add Budget"}
               </Button>
             </form>
           </DialogContent>
@@ -221,13 +261,22 @@ export default function Budget() {
           <Card key={budget.id} className="border-0 shadow-lg hover:shadow-xl transition-shadow">
             <CardHeader className="flex flex-row items-center justify-between pb-2">
               <CardTitle className="text-lg">{budget.category}</CardTitle>
-              <Button
-                variant="ghost"
-                size="icon"
-                onClick={() => handleDelete(budget.id)}
-              >
-                <Trash2 className="h-4 w-4 text-destructive" />
-              </Button>
+              <div className="flex gap-1">
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  onClick={() => handleEdit(budget)}
+                >
+                  <Pencil className="h-4 w-4" />
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  onClick={() => handleDelete(budget.id)}
+                >
+                  <Trash2 className="h-4 w-4 text-destructive" />
+                </Button>
+              </div>
             </CardHeader>
             <CardContent>
               <div className="text-2xl font-bold text-primary">

@@ -9,7 +9,7 @@ import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "
 import { Input } from "@/components/ui/input";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { Plus, Trash2 } from "lucide-react";
+import { Plus, Trash2, Pencil } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 
 const goalSchema = z
@@ -35,6 +35,7 @@ const createGoalSchema = z.object({
 export default function Goals() {
   const [goals, setGoals] = useState<any[]>([]);
   const [open, setOpen] = useState(false);
+  const [editingId, setEditingId] = useState<string | null>(null);
   const { toast } = useToast();
   
   const form = useForm({
@@ -72,22 +73,52 @@ export default function Goals() {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) return;
 
-    const { error } = await supabase.from("savings_goals").insert({
-      user_id: user.id,
-      name: values.name,
-      target_amount: values.target_amount,
-      current_amount: values.current_amount,
-      deadline: values.deadline || null,
-    });
+    if (editingId) {
+      const { error } = await supabase.from("savings_goals").update({
+        name: values.name,
+        target_amount: values.target_amount,
+        current_amount: values.current_amount,
+        deadline: values.deadline || null,
+      }).eq("id", editingId);
 
-    if (error) {
-      toast({ title: "Error", description: error.message, variant: "destructive" });
+      if (error) {
+        toast({ title: "Error", description: error.message, variant: "destructive" });
+      } else {
+        toast({ title: "Success", description: "Goal updated successfully" });
+        setOpen(false);
+        setEditingId(null);
+        form.reset();
+        fetchGoals();
+      }
     } else {
-      toast({ title: "Success", description: "Savings goal created successfully" });
-      setOpen(false);
-      form.reset();
-      fetchGoals();
+      const { error } = await supabase.from("savings_goals").insert({
+        user_id: user.id,
+        name: values.name,
+        target_amount: values.target_amount,
+        current_amount: values.current_amount,
+        deadline: values.deadline || null,
+      });
+
+      if (error) {
+        toast({ title: "Error", description: error.message, variant: "destructive" });
+      } else {
+        toast({ title: "Success", description: "Savings goal created successfully" });
+        setOpen(false);
+        form.reset();
+        fetchGoals();
+      }
     }
+  };
+
+  const handleEdit = (goal: any) => {
+    setEditingId(goal.id);
+    form.reset({
+      name: goal.name,
+      target_amount: goal.target_amount,
+      current_amount: goal.current_amount,
+      deadline: goal.deadline || "",
+    });
+    setOpen(true);
   };
 
   const handleDelete = async (id: string) => {
@@ -111,7 +142,13 @@ export default function Goals() {
         <h1 className="text-3xl font-bold bg-gradient-to-r from-primary to-secondary bg-clip-text text-transparent">
           Savings Goals
         </h1>
-        <Dialog open={open} onOpenChange={setOpen}>
+        <Dialog open={open} onOpenChange={(open) => {
+          setOpen(open);
+          if (!open) {
+            setEditingId(null);
+            form.reset();
+          }
+        }}>
           <DialogTrigger asChild>
             <Button>
               <Plus className="mr-2 h-4 w-4" />
@@ -120,7 +157,7 @@ export default function Goals() {
           </DialogTrigger>
           <DialogContent>
             <DialogHeader>
-              <DialogTitle>Create Savings Goal</DialogTitle>
+              <DialogTitle>{editingId ? "Edit Savings Goal" : "Create Savings Goal"}</DialogTitle>
             </DialogHeader>
             <Form {...form}>
               <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
@@ -176,7 +213,7 @@ export default function Goals() {
                     </FormItem>
                   )}
                 />
-                <Button type="submit" className="w-full">Create Goal</Button>
+                <Button type="submit" className="w-full">{editingId ? "Update Goal" : "Create Goal"}</Button>
               </form>
             </Form>
           </DialogContent>
@@ -192,14 +229,23 @@ export default function Goals() {
             <Card key={goal.id}>
               <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                 <CardTitle>{goal.name}</CardTitle>
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  onClick={() => handleDelete(goal.id)}
-                  className="text-destructive hover:text-destructive"
-                >
-                  <Trash2 className="h-4 w-4" />
-                </Button>
+                <div className="flex gap-1">
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    onClick={() => handleEdit(goal)}
+                  >
+                    <Pencil className="h-4 w-4" />
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    onClick={() => handleDelete(goal.id)}
+                    className="text-destructive hover:text-destructive"
+                  >
+                    <Trash2 className="h-4 w-4" />
+                  </Button>
+                </div>
               </CardHeader>
               <CardContent className="flex flex-col items-center space-y-4">
                 <RadialProgress value={progress} size={120} />

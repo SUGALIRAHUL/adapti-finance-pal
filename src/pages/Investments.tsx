@@ -3,7 +3,7 @@ import { z } from "zod";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { TrendingUp, Plus, Trash2 } from "lucide-react";
+import { TrendingUp, Plus, Trash2, Pencil } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
@@ -37,6 +37,7 @@ const createInvestmentSchema = z.object({
 export default function Investments() {
   const [investments, setInvestments] = useState<any[]>([]);
   const [open, setOpen] = useState(false);
+  const [editingId, setEditingId] = useState<string | null>(null);
   const [recommendationsOpen, setRecommendationsOpen] = useState(false);
   const [recommendations, setRecommendations] = useState<any>(null);
   const [loading, setLoading] = useState(false);
@@ -117,25 +118,60 @@ export default function Investments() {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) return;
 
-    const { error } = await supabase.from("investments").insert({
-      user_id: user.id,
-      name: values.name,
-      type: values.type,
-      current_value: values.current_value,
-      quantity: values.quantity,
-      purchase_price: values.purchase_price,
-      purchase_date: values.purchase_date,
-      amount: values.purchase_price * values.quantity,
-    });
+    if (editingId) {
+      const { error } = await supabase.from("investments").update({
+        name: values.name,
+        type: values.type,
+        current_value: values.current_value,
+        quantity: values.quantity,
+        purchase_price: values.purchase_price,
+        purchase_date: values.purchase_date,
+        amount: values.purchase_price * values.quantity,
+      }).eq("id", editingId);
 
-    if (error) {
-      toast({ title: "Error", description: error.message, variant: "destructive" });
+      if (error) {
+        toast({ title: "Error", description: error.message, variant: "destructive" });
+      } else {
+        toast({ title: "Success", description: "Investment updated successfully" });
+        setOpen(false);
+        setEditingId(null);
+        form.reset();
+        fetchInvestments();
+      }
     } else {
-      toast({ title: "Success", description: "Investment created successfully" });
-      setOpen(false);
-      form.reset();
-      fetchInvestments();
+      const { error } = await supabase.from("investments").insert({
+        user_id: user.id,
+        name: values.name,
+        type: values.type,
+        current_value: values.current_value,
+        quantity: values.quantity,
+        purchase_price: values.purchase_price,
+        purchase_date: values.purchase_date,
+        amount: values.purchase_price * values.quantity,
+      });
+
+      if (error) {
+        toast({ title: "Error", description: error.message, variant: "destructive" });
+      } else {
+        toast({ title: "Success", description: "Investment created successfully" });
+        setOpen(false);
+        form.reset();
+        fetchInvestments();
+      }
     }
+  };
+
+  const handleEdit = (investment: any) => {
+    setEditingId(investment.id);
+    form.reset({
+      name: investment.name,
+      type: investment.type,
+      current_value: investment.current_value,
+      quantity: investment.quantity,
+      purchase_price: investment.purchase_price,
+      purchase_date: investment.purchase_date,
+    });
+    setOpen(true);
   };
 
   const handleDelete = async (id: string) => {
@@ -160,7 +196,13 @@ export default function Investments() {
           Investments
         </h1>
         <div className="flex gap-2">
-          <Dialog open={open} onOpenChange={setOpen}>
+          <Dialog open={open} onOpenChange={(open) => {
+            setOpen(open);
+            if (!open) {
+              setEditingId(null);
+              form.reset();
+            }
+          }}>
             <DialogTrigger asChild>
               <Button>
                 <Plus className="mr-2 h-4 w-4" />
@@ -169,7 +211,7 @@ export default function Investments() {
             </DialogTrigger>
             <DialogContent>
               <DialogHeader>
-                <DialogTitle>Add Investment</DialogTitle>
+                <DialogTitle>{editingId ? "Edit Investment" : "Add Investment"}</DialogTitle>
               </DialogHeader>
               <Form {...form}>
                 <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
@@ -251,7 +293,7 @@ export default function Investments() {
                       </FormItem>
                     )}
                   />
-                  <Button type="submit" className="w-full">Add Investment</Button>
+                  <Button type="submit" className="w-full">{editingId ? "Update Investment" : "Add Investment"}</Button>
                 </form>
               </Form>
             </DialogContent>
@@ -268,14 +310,23 @@ export default function Investments() {
           <Card key={inv.id}>
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
               <CardTitle>{inv.name}</CardTitle>
-              <Button
-                variant="ghost"
-                size="icon"
-                onClick={() => handleDelete(inv.id)}
-                className="text-destructive hover:text-destructive"
-              >
-                <Trash2 className="h-4 w-4" />
-              </Button>
+              <div className="flex gap-1">
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  onClick={() => handleEdit(inv)}
+                >
+                  <Pencil className="h-4 w-4" />
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  onClick={() => handleDelete(inv.id)}
+                  className="text-destructive hover:text-destructive"
+                >
+                  <Trash2 className="h-4 w-4" />
+                </Button>
+              </div>
             </CardHeader>
             <CardContent>
               <div className="space-y-2">
