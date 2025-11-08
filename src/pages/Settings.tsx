@@ -212,22 +212,23 @@ export default function Settings() {
       phone: phone,
       options: {
         shouldCreateUser: false,
-        data: {
-          redirect_to_reset: true
-        }
       }
     });
 
     // Log error for debugging but don't expose details to user
     if (error) {
-      console.error('Phone reset error:', error.code, error.message);
+      console.error('Phone OTP error:', error.code, error.message);
+      toast({
+        variant: "destructive",
+        title: "Error",
+        description: "Failed to send OTP. Please try again.",
+      });
+    } else {
+      toast({
+        title: "OTP Sent",
+        description: "Check your phone for a verification code. You'll be able to reset your password after verifying.",
+      });
     }
-
-    // Always show generic success message to prevent account enumeration
-    toast({
-      title: "Password reset link sent",
-      description: "If an account exists with this phone number, you'll receive a link to reset your password.",
-    });
   };
 
   return (

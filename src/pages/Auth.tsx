@@ -9,6 +9,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { toast } from "@/hooks/use-toast";
 import { z } from "zod";
 import { Mail, UserCircle } from "lucide-react";
+import { InputOTP, InputOTPGroup, InputOTPSlot } from "@/components/ui/input-otp";
 
 const signupSchema = z.object({
   email: z.string().email('Invalid email address').max(255, 'Email too long'),
@@ -78,6 +79,8 @@ export default function Auth() {
   const [isPasswordReset, setIsPasswordReset] = useState(false);
   const [newPassword, setNewPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
+  const [otpMode, setOtpMode] = useState(false);
+  const [otp, setOtp] = useState("");
 
   useEffect(() => {
     // Check if this is a password reset link
@@ -228,29 +231,79 @@ export default function Auth() {
         description: "If an account exists with this email, you will receive a password reset link.",
       });
     } else {
-      // For phone, send magic link via SMS
+      // For phone, send OTP
       const { error } = await supabase.auth.signInWithOtp({
         phone: resetPhone,
         options: {
           shouldCreateUser: false,
-          data: {
-            redirect_to_reset: true
-          }
         }
       });
 
       if (error) {
-        console.error('Phone reset error:', error.code, error.message);
+        console.error('Phone OTP error:', error.code, error.message);
+        toast({
+          variant: "destructive",
+          title: "Error",
+          description: "Failed to send OTP. Please check your phone number and try again.",
+        });
+      } else {
+        setOtpMode(true);
+        toast({
+          title: "OTP Sent",
+          description: "Please check your phone for the verification code.",
+        });
       }
-
-      setResetSent(true);
-      toast({
-        title: "Check your phone",
-        description: "If an account exists with this number, you will receive a link to reset your password.",
-      });
     }
 
     setLoading(false);
+  };
+
+  const handleVerifyOtp = async (e: React.FormEvent) => {
+    e.preventDefault();
+    
+    if (otp.length !== 6) {
+      toast({
+        variant: "destructive",
+        title: "Invalid OTP",
+        description: "Please enter a 6-digit code",
+      });
+      return;
+    }
+
+    setLoading(true);
+
+    try {
+      const { error } = await supabase.auth.verifyOtp({
+        phone: resetPhone,
+        token: otp,
+        type: 'sms'
+      });
+
+      if (error) {
+        console.error('OTP verification error:', error.code, error.message);
+        toast({
+          variant: "destructive",
+          title: "Verification Failed",
+          description: "Invalid or expired OTP. Please try again.",
+        });
+      } else {
+        // OTP verified, now show password reset form
+        setOtpMode(false);
+        setIsPasswordReset(true);
+        toast({
+          title: "Verified",
+          description: "Please enter your new password",
+        });
+      }
+    } catch (error: any) {
+      toast({
+        variant: "destructive",
+        title: "Error",
+        description: "Failed to verify OTP. Please try again.",
+      });
+    } finally {
+      setLoading(false);
+    }
   };
 
   const handlePasswordReset = async (e: React.FormEvent) => {
@@ -538,37 +591,74 @@ export default function Auth() {
               </form>
             </TabsContent>
             <TabsContent value="forgot">
-              {resetSent ? (
+              {otpMode ? (
+                <form onSubmit={handleVerifyOtp} className="space-y-6">
+                  <div className="text-center space-y-4">
+                    <div className="h-16 w-16 rounded-full bg-primary/10 flex items-center justify-center mx-auto">
+                      <UserCircle className="h-8 w-8 text-primary" />
+                    </div>
+                    <div>
+                      <h3 className="text-xl font-semibold">Enter OTP</h3>
+                      <p className="text-muted-foreground text-sm mt-2">
+                        We've sent a 6-digit code to <strong>{resetPhone}</strong>
+                      </p>
+                    </div>
+                  </div>
+                  
+                  <div className="flex justify-center">
+                    <InputOTP
+                      maxLength={6}
+                      value={otp}
+                      onChange={(value) => setOtp(value)}
+                    >
+                      <InputOTPGroup>
+                        <InputOTPSlot index={0} />
+                        <InputOTPSlot index={1} />
+                        <InputOTPSlot index={2} />
+                        <InputOTPSlot index={3} />
+                        <InputOTPSlot index={4} />
+                        <InputOTPSlot index={5} />
+                      </InputOTPGroup>
+                    </InputOTP>
+                  </div>
+
+                  <Button type="submit" className="w-full" disabled={loading || otp.length !== 6}>
+                    {loading ? "Verifying..." : "Verify OTP"}
+                  </Button>
+                  
+                  <Button 
+                    type="button"
+                    variant="outline" 
+                    onClick={() => {
+                      setOtpMode(false);
+                      setOtp("");
+                    }}
+                    className="w-full"
+                  >
+                    Back
+                  </Button>
+                </form>
+              ) : resetSent ? (
                 <div className="text-center py-6 space-y-4">
                   <div className="h-16 w-16 rounded-full bg-primary/10 flex items-center justify-center mx-auto">
                     <Mail className="h-8 w-8 text-primary" />
                   </div>
-                  <h3 className="text-xl font-semibold">
-                    {resetMethod === "email" ? "Check Your Email" : "Check Your Phone"}
-                  </h3>
+                  <h3 className="text-xl font-semibold">Check Your Email</h3>
                   <p className="text-muted-foreground">
-                    {resetMethod === "email" ? (
-                      <>We've sent a password reset link to <strong>{resetEmail}</strong></>
-                    ) : (
-                      <>We've sent an OTP to <strong>{resetPhone}</strong></>
-                    )}
+                    We've sent a password reset link to <strong>{resetEmail}</strong>
                   </p>
                   <p className="text-sm text-muted-foreground">
-                    {resetMethod === "email" 
-                      ? "Click the link in the email to reset your password. The link will expire in 1 hour."
-                      : "Enter the OTP you received to verify your identity and reset your password."
-                    }
+                    Click the link in the email to reset your password. The link will expire in 1 hour.
                   </p>
                   <Button 
                     variant="outline" 
                     onClick={() => {
                       setResetSent(false);
                       setResetEmail("");
-                      setResetPhone("");
                     }}
                     className="mt-4"
                   >
-                    Send Another {resetMethod === "email" ? "Link" : "OTP"}
+                    Send Another Link
                   </Button>
                 </div>
               ) : (
