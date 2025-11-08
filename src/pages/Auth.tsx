@@ -228,19 +228,25 @@ export default function Auth() {
         description: "If an account exists with this email, you will receive a password reset link.",
       });
     } else {
-      // For phone, send OTP
+      // For phone, send magic link via SMS
       const { error } = await supabase.auth.signInWithOtp({
         phone: resetPhone,
+        options: {
+          shouldCreateUser: false,
+          data: {
+            redirect_to_reset: true
+          }
+        }
       });
 
       if (error) {
-        console.error('Phone OTP error:', error.code, error.message);
+        console.error('Phone reset error:', error.code, error.message);
       }
 
       setResetSent(true);
       toast({
         title: "Check your phone",
-        description: "If an account exists with this number, you will receive an OTP to reset your password.",
+        description: "If an account exists with this number, you will receive a link to reset your password.",
       });
     }
 

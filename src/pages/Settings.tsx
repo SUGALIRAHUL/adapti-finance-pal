@@ -210,17 +210,23 @@ export default function Settings() {
 
     const { error } = await supabase.auth.signInWithOtp({
       phone: phone,
+      options: {
+        shouldCreateUser: false,
+        data: {
+          redirect_to_reset: true
+        }
+      }
     });
 
     // Log error for debugging but don't expose details to user
     if (error) {
-      console.error('Phone OTP error:', error.code, error.message);
+      console.error('Phone reset error:', error.code, error.message);
     }
 
     // Always show generic success message to prevent account enumeration
     toast({
-      title: "OTP sent",
-      description: "If an account exists with this phone number, you'll receive an OTP to reset your password.",
+      title: "Password reset link sent",
+      description: "If an account exists with this phone number, you'll receive a link to reset your password.",
     });
   };
 
