@@ -5,11 +5,12 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { User, Key, Mail, Upload, Camera } from "lucide-react";
+import { User, Key, Mail, Camera, Shield, QrCode } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
+import { QRCodeSVG } from "qrcode.react";
 import {
   Form,
   FormControl,
@@ -46,6 +47,11 @@ export default function Settings() {
   const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
   const [uploading, setUploading] = useState(false);
   const [userId, setUserId] = useState<string | null>(null);
+  const [mfaSecret, setMfaSecret] = useState<string | null>(null);
+  const [mfaQrUrl, setMfaQrUrl] = useState<string | null>(null);
+  const [mfaToken, setMfaToken] = useState("");
+  const [mfaEnabled, setMfaEnabled] = useState(false);
+  const [mfaLoading, setMfaLoading] = useState(false);
   
   const form = useForm<ProfileFormData>({
     resolver: zodResolver(profileSchema),
@@ -65,6 +71,7 @@ export default function Settings() {
 
   useEffect(() => {
     fetchProfile();
+    checkMfaStatus();
   }, []);
 
   const fetchProfile = async () => {
@@ -198,36 +205,92 @@ export default function Settings() {
     });
   };
 
-  const handlePhonePasswordReset = async () => {
-    const phone = form.getValues('mobile_number');
-    if (!phone) {
+  const checkMfaStatus = async () => {
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) return;
+
+      const { data, error } = await supabase.functions.invoke('mfa-setup', {
+        body: { action: 'check' }
+      });
+
+      if (error) throw error;
+      setMfaEnabled(data.enabled || false);
+    } catch (error) {
+      console.error('Error checking MFA status:', error);
+    }
+  };
+
+  const handleSetupMfa = async () => {
+    setMfaLoading(true);
+    try {
+      const { data, error } = await supabase.functions.invoke('mfa-setup', {
+        body: { action: 'setup' }
+      });
+
+      if (error) throw error;
+
+      setMfaSecret(data.secret);
+      setMfaQrUrl(data.qrCodeUrl);
+      toast({
+        title: "MFA Setup Started",
+        description: "Scan the QR code with your authenticator app.",
+      });
+    } catch (error: any) {
+      console.error('MFA setup error:', error);
       toast({
         variant: "destructive",
-        title: "Phone number not found",
-        description: "Please add your phone number to your profile first",
+        title: "Setup Failed",
+        description: error.message || "Failed to setup MFA. Please try again.",
+      });
+    } finally {
+      setMfaLoading(false);
+    }
+  };
+
+  const handleVerifyMfa = async () => {
+    if (!mfaToken || mfaToken.length !== 6) {
+      toast({
+        variant: "destructive",
+        title: "Invalid Code",
+        description: "Please enter a 6-digit code from your authenticator app.",
       });
       return;
     }
 
-    const { error } = await supabase.auth.signInWithOtp({
-      phone: phone,
-      options: {
-        shouldCreateUser: false,
-      }
-    });
+    setMfaLoading(true);
+    try {
+      const { data, error } = await supabase.functions.invoke('mfa-setup', {
+        body: { action: 'verify', token: mfaToken }
+      });
 
-    if (error) {
-      console.error('Phone OTP error:', error.code, error.message);
+      if (error) throw error;
+
+      if (data.valid) {
+        setMfaEnabled(true);
+        setMfaSecret(null);
+        setMfaQrUrl(null);
+        setMfaToken("");
+        toast({
+          title: "MFA Enabled!",
+          description: "Two-factor authentication is now active on your account.",
+        });
+      } else {
+        toast({
+          variant: "destructive",
+          title: "Invalid Code",
+          description: "The code you entered is incorrect. Please try again.",
+        });
+      }
+    } catch (error: any) {
+      console.error('MFA verification error:', error);
       toast({
         variant: "destructive",
-        title: "Error",
-        description: "Failed to send OTP. Please try again.",
+        title: "Verification Failed",
+        description: error.message || "Failed to verify code. Please try again.",
       });
-    } else {
-      toast({
-        title: "OTP Sent",
-        description: "Check your phone for a verification code.",
-      });
+    } finally {
+      setMfaLoading(false);
     }
   };
 
@@ -497,24 +560,74 @@ export default function Settings() {
               <div>
                 <p className="font-medium">Password Reset</p>
                 <p className="text-sm text-muted-foreground">
-                  Reset your password via email or phone
+                  Reset your password via email
                 </p>
               </div>
             </div>
-            <div className="flex gap-2">
-              <Button onClick={handlePasswordReset} variant="destructive" className="flex-1">
-                <Mail className="h-4 w-4 mr-2" />
-                Email Link
-              </Button>
-              <Button onClick={handlePhonePasswordReset} variant="destructive" className="flex-1">
-                <User className="h-4 w-4 mr-2" />
-                Phone OTP
-              </Button>
-            </div>
+            <Button onClick={handlePasswordReset} variant="destructive" className="w-full">
+              <Mail className="h-4 w-4 mr-2" />
+              Send Email Reset Link
+            </Button>
           </div>
-          <p className="text-sm text-muted-foreground">
-            Email sends a reset link; phone sends a one-time code (OTP).
-          </p>
+
+          <div className="p-4 bg-muted rounded-lg space-y-4">
+            <div className="flex items-center gap-3">
+              <div className="h-10 w-10 rounded-full bg-primary/10 flex items-center justify-center">
+                <Shield className="h-5 w-5 text-primary" />
+              </div>
+              <div>
+                <p className="font-medium">Two-Factor Authentication</p>
+                <p className="text-sm text-muted-foreground">
+                  {mfaEnabled ? "MFA is enabled on your account" : "Add extra security with an authenticator app"}
+                </p>
+              </div>
+            </div>
+
+            {!mfaEnabled && !mfaQrUrl && (
+              <Button onClick={handleSetupMfa} disabled={mfaLoading} className="w-full">
+                <Shield className="h-4 w-4 mr-2" />
+                {mfaLoading ? "Setting up..." : "Setup Authenticator App"}
+              </Button>
+            )}
+
+            {mfaQrUrl && (
+              <div className="space-y-4">
+                <div className="flex flex-col items-center gap-4 p-4 bg-background rounded-lg border">
+                  <QRCodeSVG value={mfaQrUrl} size={200} />
+                  <p className="text-sm text-center text-muted-foreground">
+                    Scan this QR code with Google Authenticator, Authy, or any TOTP app
+                  </p>
+                  {mfaSecret && (
+                    <div className="text-xs text-center">
+                      <p className="text-muted-foreground mb-1">Or enter this key manually:</p>
+                      <code className="bg-muted px-2 py-1 rounded">{mfaSecret}</code>
+                    </div>
+                  )}
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="mfa-token">Enter 6-digit code from your app</Label>
+                  <Input
+                    id="mfa-token"
+                    type="text"
+                    placeholder="123456"
+                    maxLength={6}
+                    value={mfaToken}
+                    onChange={(e) => setMfaToken(e.target.value.replace(/\D/g, ''))}
+                  />
+                </div>
+                <Button onClick={handleVerifyMfa} disabled={mfaLoading || mfaToken.length !== 6} className="w-full">
+                  {mfaLoading ? "Verifying..." : "Verify & Enable MFA"}
+                </Button>
+              </div>
+            )}
+
+            {mfaEnabled && (
+              <div className="flex items-center gap-2 text-sm text-green-600 dark:text-green-400">
+                <Shield className="h-4 w-4" />
+                <span>MFA is active and protecting your account</span>
+              </div>
+            )}
+          </div>
         </CardContent>
       </Card>
     </div>
