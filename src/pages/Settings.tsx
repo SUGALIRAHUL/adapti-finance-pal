@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { User, Key, Mail, Camera, Shield, QrCode } from "lucide-react";
+import { User, Key, Mail, Camera, Shield, CheckCircle2 } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -48,7 +48,7 @@ export default function Settings() {
   const [uploading, setUploading] = useState(false);
   const [userId, setUserId] = useState<string | null>(null);
   const [mfaSecret, setMfaSecret] = useState<string | null>(null);
-  const [mfaQrUrl, setMfaQrUrl] = useState<string | null>(null);
+  const [mfaQrCode, setMfaQrCode] = useState<string | null>(null);
   const [mfaToken, setMfaToken] = useState("");
   const [mfaEnabled, setMfaEnabled] = useState(false);
   const [mfaLoading, setMfaLoading] = useState(false);
@@ -231,7 +231,7 @@ export default function Settings() {
       if (error) throw error;
 
       setMfaSecret(data.secret);
-      setMfaQrUrl(data.qrCodeUrl);
+      setMfaQrCode(data.qrCodeUrl);
       toast({
         title: "MFA Setup Started",
         description: "Scan the QR code with your authenticator app.",
@@ -269,7 +269,7 @@ export default function Settings() {
       if (data.valid) {
         setMfaEnabled(true);
         setMfaSecret(null);
-        setMfaQrUrl(null);
+        setMfaQrCode(null);
         setMfaToken("");
         toast({
           title: "MFA Enabled!",
@@ -583,17 +583,17 @@ export default function Settings() {
               </div>
             </div>
 
-            {!mfaEnabled && !mfaQrUrl && (
+            {!mfaEnabled && !mfaQrCode && (
               <Button onClick={handleSetupMfa} disabled={mfaLoading} className="w-full">
                 <Shield className="h-4 w-4 mr-2" />
                 {mfaLoading ? "Setting up..." : "Setup Authenticator App"}
               </Button>
             )}
 
-            {mfaQrUrl && (
+            {mfaQrCode && (
               <div className="space-y-4">
                 <div className="flex flex-col items-center gap-4 p-4 bg-background rounded-lg border">
-                  <QRCodeSVG value={mfaQrUrl} size={200} />
+                  <QRCodeSVG value={mfaQrCode} size={200} />
                   <p className="text-sm text-center text-muted-foreground">
                     Scan this QR code with Google Authenticator, Authy, or any TOTP app
                   </p>
