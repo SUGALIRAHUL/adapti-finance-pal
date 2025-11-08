@@ -197,39 +197,6 @@ export default function Settings() {
     });
   };
 
-  const handlePhonePasswordReset = async () => {
-    const phone = form.getValues('mobile_number');
-    if (!phone) {
-      toast({
-        variant: "destructive",
-        title: "Phone number not found",
-        description: "Please add your phone number to your profile first",
-      });
-      return;
-    }
-
-    const { error } = await supabase.auth.signInWithOtp({
-      phone: phone,
-      options: {
-        shouldCreateUser: false,
-      }
-    });
-
-    // Log error for debugging but don't expose details to user
-    if (error) {
-      console.error('Phone OTP error:', error.code, error.message);
-      toast({
-        variant: "destructive",
-        title: "Error",
-        description: "Failed to send OTP. Please try again.",
-      });
-    } else {
-      toast({
-        title: "OTP Sent",
-        description: "Check your phone for a verification code. You'll be able to reset your password after verifying.",
-      });
-    }
-  };
 
   return (
     <div className="space-y-6">
@@ -457,23 +424,19 @@ export default function Settings() {
               <div>
                 <p className="font-medium">Password Reset</p>
                 <p className="text-sm text-muted-foreground">
-                  Reset your password via email or phone
+                  Reset your password via email
                 </p>
               </div>
             </div>
             <div className="flex gap-2">
-              <Button onClick={handlePasswordReset} variant="destructive" className="flex-1">
+              <Button onClick={handlePasswordReset} variant="destructive" className="w-full">
                 <Mail className="h-4 w-4 mr-2" />
                 Reset via Email
-              </Button>
-              <Button onClick={handlePhonePasswordReset} variant="destructive" className="flex-1">
-                <User className="h-4 w-4 mr-2" />
-                Reset via Phone
               </Button>
             </div>
           </div>
           <p className="text-sm text-muted-foreground">
-            Choose your preferred method. You'll receive a reset link via email or an OTP via phone.
+            You'll receive a reset link via email.
           </p>
         </CardContent>
       </Card>

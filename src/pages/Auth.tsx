@@ -9,7 +9,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { toast } from "@/hooks/use-toast";
 import { z } from "zod";
 import { Mail, UserCircle } from "lucide-react";
-import { InputOTP, InputOTPGroup, InputOTPSlot } from "@/components/ui/input-otp";
+
 
 const signupSchema = z.object({
   email: z.string().email('Invalid email address').max(255, 'Email too long'),
@@ -73,14 +73,10 @@ export default function Auth() {
   const [dateOfBirth, setDateOfBirth] = useState("");
   const [bio, setBio] = useState("");
   const [resetEmail, setResetEmail] = useState("");
-  const [resetPhone, setResetPhone] = useState("");
-  const [resetMethod, setResetMethod] = useState<"email" | "phone">("email");
   const [resetSent, setResetSent] = useState(false);
   const [isPasswordReset, setIsPasswordReset] = useState(false);
   const [newPassword, setNewPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
-  const [otpMode, setOtpMode] = useState(false);
-  const [otp, setOtp] = useState("");
 
   useEffect(() => {
     // Check if this is a password reset link
@@ -196,7 +192,7 @@ export default function Auth() {
   const handleForgotPassword = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    if (resetMethod === "email" && !resetEmail) {
+    if (!resetEmail) {
       toast({
         variant: "destructive",
         title: "Email required",
@@ -205,106 +201,25 @@ export default function Auth() {
       return;
     }
 
-    if (resetMethod === "phone" && !resetPhone) {
-      toast({
-        variant: "destructive",
-        title: "Phone required",
-        description: "Please enter your phone number",
-      });
-      return;
-    }
-
     setLoading(true);
 
-    if (resetMethod === "email") {
-      const { error } = await supabase.auth.resetPasswordForEmail(resetEmail, {
-        redirectTo: `${window.location.origin}/auth`,
-      });
+    const { error } = await supabase.auth.resetPasswordForEmail(resetEmail, {
+      redirectTo: `${window.location.origin}/auth`,
+    });
 
-      if (error) {
-        console.error('Password reset error:', error.code, error.message);
-      }
-      
-      setResetSent(true);
-      toast({
-        title: "Check your email",
-        description: "If an account exists with this email, you will receive a password reset link.",
-      });
-    } else {
-      // For phone, send OTP
-      const { error } = await supabase.auth.signInWithOtp({
-        phone: resetPhone,
-        options: {
-          shouldCreateUser: false,
-        }
-      });
-
-      if (error) {
-        console.error('Phone OTP error:', error.code, error.message);
-        toast({
-          variant: "destructive",
-          title: "Error",
-          description: "Failed to send OTP. Please check your phone number and try again.",
-        });
-      } else {
-        setOtpMode(true);
-        toast({
-          title: "OTP Sent",
-          description: "Please check your phone for the verification code.",
-        });
-      }
+    if (error) {
+      console.error('Password reset error:', error.code, error.message);
     }
+    
+    setResetSent(true);
+    toast({
+      title: "Check your email",
+      description: "If an account exists with this email, you will receive a password reset link.",
+    });
 
     setLoading(false);
   };
 
-  const handleVerifyOtp = async (e: React.FormEvent) => {
-    e.preventDefault();
-    
-    if (otp.length !== 6) {
-      toast({
-        variant: "destructive",
-        title: "Invalid OTP",
-        description: "Please enter a 6-digit code",
-      });
-      return;
-    }
-
-    setLoading(true);
-
-    try {
-      const { error } = await supabase.auth.verifyOtp({
-        phone: resetPhone,
-        token: otp,
-        type: 'sms'
-      });
-
-      if (error) {
-        console.error('OTP verification error:', error.code, error.message);
-        toast({
-          variant: "destructive",
-          title: "Verification Failed",
-          description: "Invalid or expired OTP. Please try again.",
-        });
-      } else {
-        // OTP verified, now show password reset form
-        setOtpMode(false);
-        setIsPasswordReset(true);
-        toast({
-          title: "Verified",
-          description: "Please enter your new password",
-        });
-      }
-    } catch (error: any) {
-      toast({
-        variant: "destructive",
-        title: "Error",
-        description: "Failed to verify OTP. Please try again.",
-      });
-    } finally {
-      setLoading(false);
-    }
-  };
 
   const handlePasswordReset = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -591,54 +506,7 @@ export default function Auth() {
               </form>
             </TabsContent>
             <TabsContent value="forgot">
-              {otpMode ? (
-                <form onSubmit={handleVerifyOtp} className="space-y-6">
-                  <div className="text-center space-y-4">
-                    <div className="h-16 w-16 rounded-full bg-primary/10 flex items-center justify-center mx-auto">
-                      <UserCircle className="h-8 w-8 text-primary" />
-                    </div>
-                    <div>
-                      <h3 className="text-xl font-semibold">Enter OTP</h3>
-                      <p className="text-muted-foreground text-sm mt-2">
-                        We've sent a 6-digit code to <strong>{resetPhone}</strong>
-                      </p>
-                    </div>
-                  </div>
-                  
-                  <div className="flex justify-center">
-                    <InputOTP
-                      maxLength={6}
-                      value={otp}
-                      onChange={(value) => setOtp(value)}
-                    >
-                      <InputOTPGroup>
-                        <InputOTPSlot index={0} />
-                        <InputOTPSlot index={1} />
-                        <InputOTPSlot index={2} />
-                        <InputOTPSlot index={3} />
-                        <InputOTPSlot index={4} />
-                        <InputOTPSlot index={5} />
-                      </InputOTPGroup>
-                    </InputOTP>
-                  </div>
-
-                  <Button type="submit" className="w-full" disabled={loading || otp.length !== 6}>
-                    {loading ? "Verifying..." : "Verify OTP"}
-                  </Button>
-                  
-                  <Button 
-                    type="button"
-                    variant="outline" 
-                    onClick={() => {
-                      setOtpMode(false);
-                      setOtp("");
-                    }}
-                    className="w-full"
-                  >
-                    Back
-                  </Button>
-                </form>
-              ) : resetSent ? (
+              {resetSent ? (
                 <div className="text-center py-6 space-y-4">
                   <div className="h-16 w-16 rounded-full bg-primary/10 flex items-center justify-center mx-auto">
                     <Mail className="h-8 w-8 text-primary" />
@@ -664,63 +532,21 @@ export default function Auth() {
               ) : (
                 <form onSubmit={handleForgotPassword} className="space-y-4">
                   <div className="space-y-2">
-                    <Label>Reset Method</Label>
-                    <div className="flex gap-4">
-                      <Button
-                        type="button"
-                        variant={resetMethod === "email" ? "default" : "outline"}
-                        onClick={() => setResetMethod("email")}
-                        className="flex-1"
-                      >
-                        <Mail className="h-4 w-4 mr-2" />
-                        Email
-                      </Button>
-                      <Button
-                        type="button"
-                        variant={resetMethod === "phone" ? "default" : "outline"}
-                        onClick={() => setResetMethod("phone")}
-                        className="flex-1"
-                      >
-                        <UserCircle className="h-4 w-4 mr-2" />
-                        Phone
-                      </Button>
-                    </div>
+                    <Label htmlFor="reset-email">Email Address</Label>
+                    <Input
+                      id="reset-email"
+                      type="email"
+                      placeholder="your@email.com"
+                      value={resetEmail}
+                      onChange={(e) => setResetEmail(e.target.value)}
+                      required
+                    />
+                    <p className="text-sm text-muted-foreground">
+                      Enter your registered email address and we'll send you a link to reset your password.
+                    </p>
                   </div>
-                  
-                  {resetMethod === "email" ? (
-                    <div className="space-y-2">
-                      <Label htmlFor="reset-email">Email Address</Label>
-                      <Input
-                        id="reset-email"
-                        type="email"
-                        placeholder="your@email.com"
-                        value={resetEmail}
-                        onChange={(e) => setResetEmail(e.target.value)}
-                        required
-                      />
-                      <p className="text-sm text-muted-foreground">
-                        Enter your registered email address and we'll send you a link to reset your password.
-                      </p>
-                    </div>
-                  ) : (
-                    <div className="space-y-2">
-                      <Label htmlFor="reset-phone">Phone Number</Label>
-                      <Input
-                        id="reset-phone"
-                        type="tel"
-                        placeholder="+1234567890"
-                        value={resetPhone}
-                        onChange={(e) => setResetPhone(e.target.value)}
-                        required
-                      />
-                      <p className="text-sm text-muted-foreground">
-                        Enter your registered phone number and we'll send you an OTP to reset your password.
-                      </p>
-                    </div>
-                  )}
-                  
                   <Button type="submit" className="w-full" disabled={loading}>
-                    {loading ? "Sending..." : `Send ${resetMethod === "email" ? "Reset Link" : "OTP"}`}
+                    {loading ? "Sending..." : "Send Reset Link"}
                   </Button>
                 </form>
               )}
