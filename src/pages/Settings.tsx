@@ -25,7 +25,7 @@ const profileSchema = z.object({
   display_name: z.string().trim().min(1, "Display name is required").max(50, "Display name must be less than 50 characters"),
   email: z.string().email(),
   recovery_email: z.string().email("Please enter a valid email address").optional().or(z.literal("")),
-  mobile_number: z.string().trim().regex(/^\+?[1-9]\d{1,14}$/, "Please enter a valid international phone number (e.g., +1234567890)").optional().or(z.literal("")),
+  mobile_number: z.string().trim().regex(/^\+[1-9]\d{1,14}$/, "Phone number must start with + followed by country code and 1-14 digits (e.g., +14155552671)").optional().or(z.literal("")),
   profession: z.string().trim().max(100, "Profession must be less than 100 characters").optional().or(z.literal("")),
   city: z.string().trim().max(100, "City must be less than 100 characters").optional().or(z.literal("")),
   country: z.string().trim().max(100, "Country must be less than 100 characters").optional().or(z.literal("")),
@@ -353,9 +353,12 @@ export default function Settings() {
                     <FormItem>
                       <FormLabel>Mobile Number</FormLabel>
                       <FormControl>
-                        <Input placeholder="+1234567890" {...field} />
+                        <Input placeholder="+14155552671" {...field} />
                       </FormControl>
                       <FormMessage />
+                      <p className="text-sm text-muted-foreground">
+                        Required for phone-based password reset. Format: +[country code][number] (e.g., +14155552671 for US)
+                      </p>
                     </FormItem>
                   )}
                 />

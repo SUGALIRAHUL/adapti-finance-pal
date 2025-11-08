@@ -30,7 +30,7 @@ const signupSchema = z.object({
     .max(50, 'Display name too long'),
   mobileNumber: z.string()
     .trim()
-    .regex(/^\+?[1-9]\d{1,14}$/, 'Invalid mobile number format'),
+    .regex(/^\+[1-9]\d{1,14}$/, 'Phone number must start with + followed by country code and digits (e.g., +14155552671)'),
   profession: z.string()
     .trim()
     .min(1, 'Profession required')
@@ -438,11 +438,14 @@ export default function Auth() {
                     <Input
                       id="signup-mobile"
                       type="tel"
-                      placeholder="+1234567890"
+                      placeholder="+14155552671"
                       value={mobileNumber}
                       onChange={(e) => setMobileNumber(e.target.value)}
                       required
                     />
+                    <p className="text-xs text-muted-foreground">
+                      Format: +[country code][number] (e.g., +14155552671 for US, +442071234567 for UK)
+                    </p>
                   </div>
                   <div className="space-y-2">
                     <Label htmlFor="signup-dob">Date of Birth</Label>
