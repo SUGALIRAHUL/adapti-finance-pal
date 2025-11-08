@@ -50,7 +50,11 @@ export default function Reports() {
                 <XAxis dataKey="category" />
                 <YAxis />
                 <Tooltip />
-                <Bar dataKey="amount" fill="hsl(var(--primary))" />
+                <Bar dataKey="amount">
+                  {expenseData.map((entry, index) => (
+                    <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                  ))}
+                </Bar>
               </BarChart>
             </ResponsiveContainer>
           </CardContent>

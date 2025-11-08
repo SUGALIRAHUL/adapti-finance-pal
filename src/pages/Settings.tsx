@@ -197,6 +197,33 @@ export default function Settings() {
     });
   };
 
+  const handlePhonePasswordReset = async () => {
+    const phone = form.getValues('mobile_number');
+    if (!phone) {
+      toast({
+        variant: "destructive",
+        title: "Phone number not found",
+        description: "Please add your phone number to your profile first",
+      });
+      return;
+    }
+
+    const { error } = await supabase.auth.signInWithOtp({
+      phone: phone,
+    });
+
+    // Log error for debugging but don't expose details to user
+    if (error) {
+      console.error('Phone OTP error:', error.code, error.message);
+    }
+
+    // Always show generic success message to prevent account enumeration
+    toast({
+      title: "OTP sent",
+      description: "If an account exists with this phone number, you'll receive an OTP to reset your password.",
+    });
+  };
+
   return (
     <div className="space-y-6">
       <h1 className="text-3xl font-bold bg-gradient-to-r from-primary via-accent to-secondary bg-clip-text text-transparent">
@@ -415,24 +442,31 @@ export default function Settings() {
           <CardDescription>Manage your password and account security</CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
-          <div className="flex items-center justify-between p-4 bg-muted rounded-lg">
+          <div className="p-4 bg-muted rounded-lg space-y-4">
             <div className="flex items-center gap-3">
               <div className="h-10 w-10 rounded-full bg-destructive/10 flex items-center justify-center">
                 <Key className="h-5 w-5 text-destructive" />
               </div>
               <div>
-                <p className="font-medium">Password</p>
+                <p className="font-medium">Password Reset</p>
                 <p className="text-sm text-muted-foreground">
-                  Reset your password via email
+                  Reset your password via email or phone
                 </p>
               </div>
             </div>
-            <Button onClick={handlePasswordReset} variant="destructive">
-              Reset Password
-            </Button>
+            <div className="flex gap-2">
+              <Button onClick={handlePasswordReset} variant="destructive" className="flex-1">
+                <Mail className="h-4 w-4 mr-2" />
+                Reset via Email
+              </Button>
+              <Button onClick={handlePhonePasswordReset} variant="destructive" className="flex-1">
+                <User className="h-4 w-4 mr-2" />
+                Reset via Phone
+              </Button>
+            </div>
           </div>
           <p className="text-sm text-muted-foreground">
-            You'll receive an email with instructions to reset your password. The link will expire in 1 hour.
+            Choose your preferred method. You'll receive a reset link via email or an OTP via phone.
           </p>
         </CardContent>
       </Card>

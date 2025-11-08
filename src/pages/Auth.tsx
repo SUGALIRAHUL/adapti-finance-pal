@@ -72,6 +72,8 @@ export default function Auth() {
   const [dateOfBirth, setDateOfBirth] = useState("");
   const [bio, setBio] = useState("");
   const [resetEmail, setResetEmail] = useState("");
+  const [resetPhone, setResetPhone] = useState("");
+  const [resetMethod, setResetMethod] = useState<"email" | "phone">("email");
   const [resetSent, setResetSent] = useState(false);
   const [isPasswordReset, setIsPasswordReset] = useState(false);
   const [newPassword, setNewPassword] = useState("");
@@ -191,7 +193,7 @@ export default function Auth() {
   const handleForgotPassword = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    if (!resetEmail) {
+    if (resetMethod === "email" && !resetEmail) {
       toast({
         variant: "destructive",
         title: "Email required",
@@ -200,22 +202,47 @@ export default function Auth() {
       return;
     }
 
+    if (resetMethod === "phone" && !resetPhone) {
+      toast({
+        variant: "destructive",
+        title: "Phone required",
+        description: "Please enter your phone number",
+      });
+      return;
+    }
+
     setLoading(true);
 
-    const { error } = await supabase.auth.resetPasswordForEmail(resetEmail, {
-      redirectTo: `${window.location.origin}/auth`,
-    });
+    if (resetMethod === "email") {
+      const { error } = await supabase.auth.resetPasswordForEmail(resetEmail, {
+        redirectTo: `${window.location.origin}/auth`,
+      });
 
-    if (error) {
-      console.error('Password reset error:', error.code, error.message);
+      if (error) {
+        console.error('Password reset error:', error.code, error.message);
+      }
+      
+      setResetSent(true);
+      toast({
+        title: "Check your email",
+        description: "If an account exists with this email, you will receive a password reset link.",
+      });
+    } else {
+      // For phone, send OTP
+      const { error } = await supabase.auth.signInWithOtp({
+        phone: resetPhone,
+      });
+
+      if (error) {
+        console.error('Phone OTP error:', error.code, error.message);
+      }
+
+      setResetSent(true);
+      toast({
+        title: "Check your phone",
+        description: "If an account exists with this number, you will receive an OTP to reset your password.",
+      });
     }
-    
-    // Always show success message to prevent email enumeration
-    setResetSent(true);
-    toast({
-      title: "Check your email",
-      description: "If an account exists with this email, you will receive a password reset link.",
-    });
 
     setLoading(false);
   };
@@ -510,42 +537,94 @@ export default function Auth() {
                   <div className="h-16 w-16 rounded-full bg-primary/10 flex items-center justify-center mx-auto">
                     <Mail className="h-8 w-8 text-primary" />
                   </div>
-                  <h3 className="text-xl font-semibold">Check Your Email</h3>
+                  <h3 className="text-xl font-semibold">
+                    {resetMethod === "email" ? "Check Your Email" : "Check Your Phone"}
+                  </h3>
                   <p className="text-muted-foreground">
-                    We've sent a password reset link to <strong>{resetEmail}</strong>
+                    {resetMethod === "email" ? (
+                      <>We've sent a password reset link to <strong>{resetEmail}</strong></>
+                    ) : (
+                      <>We've sent an OTP to <strong>{resetPhone}</strong></>
+                    )}
                   </p>
                   <p className="text-sm text-muted-foreground">
-                    Click the link in the email to reset your password. The link will expire in 1 hour.
+                    {resetMethod === "email" 
+                      ? "Click the link in the email to reset your password. The link will expire in 1 hour."
+                      : "Enter the OTP you received to verify your identity and reset your password."
+                    }
                   </p>
                   <Button 
                     variant="outline" 
                     onClick={() => {
                       setResetSent(false);
                       setResetEmail("");
+                      setResetPhone("");
                     }}
                     className="mt-4"
                   >
-                    Send Another Link
+                    Send Another {resetMethod === "email" ? "Link" : "OTP"}
                   </Button>
                 </div>
               ) : (
                 <form onSubmit={handleForgotPassword} className="space-y-4">
                   <div className="space-y-2">
-                    <Label htmlFor="reset-email">Email Address</Label>
-                    <Input
-                      id="reset-email"
-                      type="email"
-                      placeholder="your@email.com"
-                      value={resetEmail}
-                      onChange={(e) => setResetEmail(e.target.value)}
-                      required
-                    />
-                    <p className="text-sm text-muted-foreground">
-                      Enter your registered email address and we'll send you a link to reset your password.
-                    </p>
+                    <Label>Reset Method</Label>
+                    <div className="flex gap-4">
+                      <Button
+                        type="button"
+                        variant={resetMethod === "email" ? "default" : "outline"}
+                        onClick={() => setResetMethod("email")}
+                        className="flex-1"
+                      >
+                        <Mail className="h-4 w-4 mr-2" />
+                        Email
+                      </Button>
+                      <Button
+                        type="button"
+                        variant={resetMethod === "phone" ? "default" : "outline"}
+                        onClick={() => setResetMethod("phone")}
+                        className="flex-1"
+                      >
+                        <UserCircle className="h-4 w-4 mr-2" />
+                        Phone
+                      </Button>
+                    </div>
                   </div>
+                  
+                  {resetMethod === "email" ? (
+                    <div className="space-y-2">
+                      <Label htmlFor="reset-email">Email Address</Label>
+                      <Input
+                        id="reset-email"
+                        type="email"
+                        placeholder="your@email.com"
+                        value={resetEmail}
+                        onChange={(e) => setResetEmail(e.target.value)}
+                        required
+                      />
+                      <p className="text-sm text-muted-foreground">
+                        Enter your registered email address and we'll send you a link to reset your password.
+                      </p>
+                    </div>
+                  ) : (
+                    <div className="space-y-2">
+                      <Label htmlFor="reset-phone">Phone Number</Label>
+                      <Input
+                        id="reset-phone"
+                        type="tel"
+                        placeholder="+1234567890"
+                        value={resetPhone}
+                        onChange={(e) => setResetPhone(e.target.value)}
+                        required
+                      />
+                      <p className="text-sm text-muted-foreground">
+                        Enter your registered phone number and we'll send you an OTP to reset your password.
+                      </p>
+                    </div>
+                  )}
+                  
                   <Button type="submit" className="w-full" disabled={loading}>
-                    {loading ? "Sending..." : "Send Reset Link"}
+                    {loading ? "Sending..." : `Send ${resetMethod === "email" ? "Reset Link" : "OTP"}`}
                   </Button>
                 </form>
               )}

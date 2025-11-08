@@ -11,26 +11,25 @@ export function FormattedMessage({ content }: FormattedMessageProps) {
     KEEP_CONTENT: true // Keep the text content
   });
   
+  // Remove all asterisks used for markdown formatting
+  const cleanContent = sanitizedContent.replace(/\*\*/g, '');
+  
   // Split content into lines
-  const lines = sanitizedContent.split('\n');
+  const lines = cleanContent.split('\n');
   
   return (
     <div className="space-y-3">
       {lines.map((line, index) => {
-        // Check if line is a heading (starts with ##, ###, or is all caps with colon)
+        // Check if line is a heading (starts with ##, ###)
         const isMainHeading = line.trim().startsWith('## ');
         const isSubHeading = line.trim().startsWith('### ');
-        const isBoldText = line.trim().match(/^\*\*.*\*\*:?$/);
         const isNumberedList = line.trim().match(/^\d+\./);
         const isBulletList = line.trim().startsWith('- ') || line.trim().startsWith('* ');
         
-        // Remove markdown symbols
+        // Remove markdown symbols for headings
         let cleanedLine = line
           .replace(/^##\s+/, '')
-          .replace(/^###\s+/, '')
-          .replace(/^\*\*/, '')
-          .replace(/\*\*$/, '')
-          .replace(/\*\*:/, ':');
+          .replace(/^###\s+/, '');
 
         if (line.trim() === '') {
           return <div key={index} className="h-2" />;
@@ -52,14 +51,6 @@ export function FormattedMessage({ content }: FormattedMessageProps) {
           );
         }
 
-        if (isBoldText) {
-          return (
-            <p key={index} className="font-bold text-foreground">
-              {cleanedLine}
-            </p>
-          );
-        }
-
         if (isNumberedList || isBulletList) {
           return (
             <p key={index} className="ml-4 text-foreground/90">
@@ -68,21 +59,10 @@ export function FormattedMessage({ content }: FormattedMessageProps) {
           );
         }
 
-        // Regular paragraph - preserve inline bold
-        const formattedLine = cleanedLine.split(/(\*\*.*?\*\*)/).map((part, i) => {
-          if (part.startsWith('**') && part.endsWith('**')) {
-            return (
-              <strong key={i} className="font-semibold">
-                {part.slice(2, -2)}
-              </strong>
-            );
-          }
-          return part;
-        });
-
+        // Regular paragraph
         return (
           <p key={index} className="text-foreground/90 leading-relaxed">
-            {formattedLine}
+            {cleanedLine}
           </p>
         );
       })}
