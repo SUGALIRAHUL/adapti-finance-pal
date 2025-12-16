@@ -8,6 +8,11 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { Plus, Trash2, Pencil } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
 import { z } from "zod";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 
 const expenseSchema = z.object({
   category: z.string()
@@ -16,7 +21,8 @@ const expenseSchema = z.object({
     .max(50, 'Category too long')
     .regex(/^[a-zA-Z0-9\s&\-]+$/, 'Invalid characters in category'),
   amount: z.number()
-    .min(0.01, 'Amount must be positive')
+    .int('Amount must be a whole number')
+    .min(1, 'Amount must be positive')
     .max(10000000, 'Amount too large'),
   description: z.string()
     .max(500, 'Description too long')
@@ -55,10 +61,9 @@ export default function Expenses() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    // Validate inputs
     const validation = expenseSchema.safeParse({
       category: formData.category,
-      amount: parseFloat(formData.amount),
+      amount: parseInt(formData.amount),
       description: formData.description || undefined,
       date: formData.date
     });
@@ -112,7 +117,7 @@ export default function Expenses() {
     setEditingId(expense.id);
     setFormData({
       category: expense.category,
-      amount: expense.amount.toString(),
+      amount: Math.round(expense.amount).toString(),
       description: expense.description || "",
       date: expense.date,
     });
@@ -153,10 +158,30 @@ export default function Expenses() {
           <DialogContent>
             <DialogHeader><DialogTitle>{editingId ? "Edit Expense" : "Add Expense"}</DialogTitle></DialogHeader>
             <form onSubmit={handleSubmit} className="space-y-4">
-              <div><Label>Category</Label><Input value={formData.category} onChange={(e) => setFormData({...formData, category: e.target.value})} required /></div>
-              <div><Label>Amount</Label><Input type="number" step="0.01" value={formData.amount} onChange={(e) => setFormData({...formData, amount: e.target.value})} required /></div>
-              <div><Label>Description</Label><Input value={formData.description} onChange={(e) => setFormData({...formData, description: e.target.value})} /></div>
-              <div><Label>Date</Label><Input type="date" value={formData.date} onChange={(e) => setFormData({...formData, date: e.target.value})} required /></div>
+              <div className="space-y-2">
+                <Label>Category <span className="text-destructive">*</span></Label>
+                <Input value={formData.category} onChange={(e) => setFormData({...formData, category: e.target.value})} required />
+              </div>
+              <div className="space-y-2">
+                <Label>Amount (₹) <span className="text-destructive">*</span></Label>
+                <Input 
+                  type="number" 
+                  step="1" 
+                  min="1"
+                  value={formData.amount} 
+                  onChange={(e) => setFormData({...formData, amount: e.target.value.replace(/\D/g, '')})} 
+                  placeholder="Enter whole number"
+                  required 
+                />
+              </div>
+              <div className="space-y-2">
+                <Label>Description</Label>
+                <Input value={formData.description} onChange={(e) => setFormData({...formData, description: e.target.value})} />
+              </div>
+              <div className="space-y-2">
+                <Label>Date <span className="text-destructive">*</span></Label>
+                <Input type="date" value={formData.date} onChange={(e) => setFormData({...formData, date: e.target.value})} required />
+              </div>
               <Button type="submit" className="w-full">{editingId ? "Update" : "Add"}</Button>
             </form>
           </DialogContent>
@@ -173,23 +198,33 @@ export default function Expenses() {
                 <p className="text-xs text-muted-foreground">{new Date(expense.date).toLocaleDateString()}</p>
               </div>
               <div className="flex items-center gap-4">
-                <div className="text-xl font-bold text-destructive">₹{Number(expense.amount).toFixed(2)}</div>
+                <div className="text-xl font-bold text-destructive">₹{Math.round(Number(expense.amount)).toLocaleString()}</div>
                 <div className="flex gap-1">
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    onClick={() => handleEdit(expense)}
-                  >
-                    <Pencil className="h-4 w-4" />
-                  </Button>
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    onClick={() => handleDelete(expense.id)}
-                    className="text-destructive hover:text-destructive"
-                  >
-                    <Trash2 className="h-4 w-4" />
-                  </Button>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        onClick={() => handleEdit(expense)}
+                      >
+                        <Pencil className="h-4 w-4" />
+                      </Button>
+                    </TooltipTrigger>
+                    <TooltipContent>Edit</TooltipContent>
+                  </Tooltip>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        onClick={() => handleDelete(expense.id)}
+                        className="text-destructive hover:text-destructive"
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    </TooltipTrigger>
+                    <TooltipContent>Delete</TooltipContent>
+                  </Tooltip>
                 </div>
               </div>
             </CardContent>

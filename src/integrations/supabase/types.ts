@@ -14,6 +14,44 @@ export type Database = {
   }
   public: {
     Tables: {
+      budget_alerts: {
+        Row: {
+          budget_id: string | null
+          created_at: string | null
+          email_sent: boolean | null
+          id: string
+          threshold_percentage: number
+          triggered_at: string | null
+          user_id: string
+        }
+        Insert: {
+          budget_id?: string | null
+          created_at?: string | null
+          email_sent?: boolean | null
+          id?: string
+          threshold_percentage?: number
+          triggered_at?: string | null
+          user_id: string
+        }
+        Update: {
+          budget_id?: string | null
+          created_at?: string | null
+          email_sent?: boolean | null
+          id?: string
+          threshold_percentage?: number
+          triggered_at?: string | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "budget_alerts_budget_id_fkey"
+            columns: ["budget_id"]
+            isOneToOne: false
+            referencedRelation: "budgets"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       budgets: {
         Row: {
           amount: number
@@ -50,6 +88,62 @@ export type Database = {
         }
         Relationships: []
       }
+      chat_conversations: {
+        Row: {
+          created_at: string
+          id: string
+          title: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          title?: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          title?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      chat_messages: {
+        Row: {
+          content: string
+          conversation_id: string
+          created_at: string
+          id: string
+          role: string
+        }
+        Insert: {
+          content: string
+          conversation_id: string
+          created_at?: string
+          id?: string
+          role: string
+        }
+        Update: {
+          content?: string
+          conversation_id?: string
+          created_at?: string
+          id?: string
+          role?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "chat_messages_conversation_id_fkey"
+            columns: ["conversation_id"]
+            isOneToOne: false
+            referencedRelation: "chat_conversations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       expenses: {
         Row: {
           amount: number
@@ -76,6 +170,42 @@ export type Database = {
           date?: string
           description?: string | null
           id?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      income: {
+        Row: {
+          amount: number
+          created_at: string | null
+          date: string
+          description: string | null
+          frequency: string
+          id: string
+          source: string
+          updated_at: string | null
+          user_id: string
+        }
+        Insert: {
+          amount: number
+          created_at?: string | null
+          date?: string
+          description?: string | null
+          frequency?: string
+          id?: string
+          source: string
+          updated_at?: string | null
+          user_id: string
+        }
+        Update: {
+          amount?: number
+          created_at?: string | null
+          date?: string
+          description?: string | null
+          frequency?: string
+          id?: string
+          source?: string
+          updated_at?: string | null
           user_id?: string
         }
         Relationships: []

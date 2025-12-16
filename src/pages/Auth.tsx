@@ -10,12 +10,14 @@ import { toast } from "@/hooks/use-toast";
 import { z } from "zod";
 import { Mail, UserCircle } from "lucide-react";
 import { CountryCodeSelector } from "@/components/CountryCodeSelector";
-
+import { CountrySelector } from "@/components/CountrySelector";
+import { CitySelector } from "@/components/CitySelector";
+import { PasswordInput } from "@/components/PasswordInput";
 
 const signupSchema = z.object({
   email: z.string().email('Invalid email address').max(255, 'Email too long'),
   password: z.string()
-    .min(12, 'Password must be at least 12 characters')
+    .min(8, 'Password must be at least 8 characters')
     .regex(/[A-Z]/, 'Password must contain an uppercase letter')
     .regex(/[a-z]/, 'Password must contain a lowercase letter')
     .regex(/[0-9]/, 'Password must contain a number')
@@ -31,7 +33,7 @@ const signupSchema = z.object({
     .max(50, 'Display name too long'),
   mobileNumber: z.string()
     .trim()
-    .regex(/^\+[1-9]\d{1,14}$/, 'Phone number must start with + followed by country code and digits (e.g., +14155552671)'),
+    .regex(/^\+[1-9]\d{6,14}$/, 'Phone number must be 7-15 digits with country code'),
   profession: z.string()
     .trim()
     .min(1, 'Profession required')
@@ -80,7 +82,6 @@ export default function Auth() {
   const [confirmPassword, setConfirmPassword] = useState("");
 
   useEffect(() => {
-    // Check if this is a password reset link
     const hashParams = new URLSearchParams(window.location.hash.substring(1));
     const type = hashParams.get('type');
     
@@ -92,7 +93,6 @@ export default function Auth() {
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    // Validate inputs
     const validation = loginSchema.safeParse({ email, password });
     if (!validation.success) {
       toast({
@@ -131,7 +131,6 @@ export default function Auth() {
   const handleSignup = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    // Validate inputs
     const validation = signupSchema.safeParse({ 
       email, 
       password, 
@@ -183,7 +182,7 @@ export default function Auth() {
     } else {
       toast({
         title: "Account created!",
-        description: "Welcome to AI Finance Tutor. You can now log in.",
+        description: "Welcome to PERSFIN. You can now log in.",
       });
     }
 
@@ -221,7 +220,6 @@ export default function Auth() {
     setLoading(false);
   };
 
-
   const handlePasswordReset = async (e: React.FormEvent) => {
     e.preventDefault();
     
@@ -234,7 +232,6 @@ export default function Auth() {
       return;
     }
 
-    // Apply same strong password validation as signup
     const passwordValidation = signupSchema.shape.password.safeParse(newPassword);
     if (!passwordValidation.success) {
       toast({
@@ -262,7 +259,6 @@ export default function Auth() {
         description: "Your password has been updated successfully!",
       });
 
-      // Clear the hash and redirect to dashboard
       window.location.hash = '';
       setIsPasswordReset(false);
       setNewPassword("");
@@ -279,7 +275,6 @@ export default function Auth() {
     }
   };
 
-  // Show password reset form if coming from reset link
   if (isPasswordReset) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-primary/20 via-accent/10 to-secondary/20 p-4">
@@ -298,30 +293,30 @@ export default function Auth() {
           <CardContent>
             <form onSubmit={handlePasswordReset} className="space-y-4">
               <div className="space-y-2">
-                <Label htmlFor="new-password">New Password</Label>
-                <Input
+                <Label htmlFor="new-password">
+                  New Password <span className="text-destructive">*</span>
+                </Label>
+                <PasswordInput
                   id="new-password"
-                  type="password"
-                  placeholder="Min. 12 characters, uppercase, lowercase, number, special char"
                   value={newPassword}
                   onChange={(e) => setNewPassword(e.target.value)}
+                  placeholder="Enter your new password"
                   required
-                  minLength={12}
+                  minLength={8}
+                  showStrength
                 />
-                <p className="text-xs text-muted-foreground">
-                  Password must be at least 12 characters and contain uppercase, lowercase, number, and special character
-                </p>
               </div>
               <div className="space-y-2">
-                <Label htmlFor="confirm-password">Confirm Password</Label>
-                <Input
+                <Label htmlFor="confirm-password">
+                  Confirm Password <span className="text-destructive">*</span>
+                </Label>
+                <PasswordInput
                   id="confirm-password"
-                  type="password"
-                  placeholder="Confirm new password"
                   value={confirmPassword}
                   onChange={(e) => setConfirmPassword(e.target.value)}
+                  placeholder="Confirm new password"
                   required
-                  minLength={12}
+                  minLength={8}
                 />
               </div>
               <Button type="submit" className="w-full" disabled={loading}>
@@ -358,7 +353,9 @@ export default function Auth() {
             <TabsContent value="login">
               <form onSubmit={handleLogin} className="space-y-4">
                 <div className="space-y-2">
-                  <Label htmlFor="login-email">Email</Label>
+                  <Label htmlFor="login-email">
+                    Email <span className="text-destructive">*</span>
+                  </Label>
                   <Input
                     id="login-email"
                     type="email"
@@ -369,13 +366,14 @@ export default function Auth() {
                   />
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="login-password">Password</Label>
-                  <Input
+                  <Label htmlFor="login-password">
+                    Password <span className="text-destructive">*</span>
+                  </Label>
+                  <PasswordInput
                     id="login-password"
-                    type="password"
-                    placeholder="••••••••"
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
+                    placeholder="Enter your password"
                     required
                   />
                 </div>
@@ -388,7 +386,9 @@ export default function Auth() {
               <form onSubmit={handleSignup} className="space-y-4">
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div className="space-y-2">
-                    <Label htmlFor="signup-name">Full Name</Label>
+                    <Label htmlFor="signup-name">
+                      Full Name <span className="text-destructive">*</span>
+                    </Label>
                     <Input
                       id="signup-name"
                       type="text"
@@ -399,7 +399,9 @@ export default function Auth() {
                     />
                   </div>
                   <div className="space-y-2">
-                    <Label htmlFor="signup-display-name">Display Name</Label>
+                    <Label htmlFor="signup-display-name">
+                      Display Name <span className="text-destructive">*</span>
+                    </Label>
                     <Input
                       id="signup-display-name"
                       type="text"
@@ -411,7 +413,9 @@ export default function Auth() {
                   </div>
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="signup-email">Email</Label>
+                  <Label htmlFor="signup-email">
+                    Email <span className="text-destructive">*</span>
+                  </Label>
                   <Input
                     id="signup-email"
                     type="email"
@@ -422,34 +426,34 @@ export default function Auth() {
                   />
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="signup-password">Password</Label>
-                  <Input
+                  <Label htmlFor="signup-password">
+                    Password <span className="text-destructive">*</span>
+                  </Label>
+                  <PasswordInput
                     id="signup-password"
-                    type="password"
-                    placeholder="••••••••"
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
+                    placeholder="Enter your password"
                     required
-                    minLength={12}
+                    minLength={8}
+                    showStrength
                   />
                 </div>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div className="space-y-2">
-                    <Label htmlFor="signup-mobile">Mobile Number</Label>
+                    <Label htmlFor="signup-mobile">
+                      Mobile Number <span className="text-destructive">*</span>
+                    </Label>
                     <div className="flex gap-2">
                       <CountryCodeSelector
                         value={mobileNumber}
                         onSelect={(code) => {
-                          // Extract the number part (remove old country code if present)
-                          let numberPart = mobileNumber;
-                          
-                          if (mobileNumber.startsWith("+")) {
-                            const match = mobileNumber.match(/^\+\d+/);
-                            if (match) {
-                              numberPart = mobileNumber.substring(match[0].length);
-                            }
+                          const currentValue = mobileNumber || "+1";
+                          const match = currentValue.match(/^\+\d+/);
+                          let numberPart = "";
+                          if (match) {
+                            numberPart = currentValue.substring(match[0].length);
                           }
-                          
                           setMobileNumber(code + numberPart);
                         }}
                         disabled={loading}
@@ -457,7 +461,7 @@ export default function Auth() {
                       <Input
                         id="signup-mobile"
                         type="tel"
-                        placeholder="4155552671"
+                        placeholder="1234567890"
                         value={mobileNumber.replace(/^\+\d+/, '')}
                         onChange={(e) => {
                           const currentValue = mobileNumber || "+1";
@@ -470,11 +474,13 @@ export default function Auth() {
                       />
                     </div>
                     <p className="text-xs text-muted-foreground">
-                      Select your country code and enter your phone number
+                      Select country code and enter phone number
                     </p>
                   </div>
                   <div className="space-y-2">
-                    <Label htmlFor="signup-dob">Date of Birth</Label>
+                    <Label htmlFor="signup-dob">
+                      Date of Birth <span className="text-destructive">*</span>
+                    </Label>
                     <Input
                       id="signup-dob"
                       type="date"
@@ -485,7 +491,9 @@ export default function Auth() {
                   </div>
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="signup-profession">Profession</Label>
+                  <Label htmlFor="signup-profession">
+                    Profession <span className="text-destructive">*</span>
+                  </Label>
                   <Input
                     id="signup-profession"
                     type="text"
@@ -497,25 +505,27 @@ export default function Auth() {
                 </div>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div className="space-y-2">
-                    <Label htmlFor="signup-city">City</Label>
-                    <Input
-                      id="signup-city"
-                      type="text"
-                      placeholder="New York"
-                      value={city}
-                      onChange={(e) => setCity(e.target.value)}
-                      required
+                    <Label htmlFor="signup-country">
+                      Country <span className="text-destructive">*</span>
+                    </Label>
+                    <CountrySelector
+                      value={country}
+                      onValueChange={(value) => {
+                        setCountry(value);
+                        setCity(""); // Reset city when country changes
+                      }}
+                      disabled={loading}
                     />
                   </div>
                   <div className="space-y-2">
-                    <Label htmlFor="signup-country">Country</Label>
-                    <Input
-                      id="signup-country"
-                      type="text"
-                      placeholder="USA"
-                      value={country}
-                      onChange={(e) => setCountry(e.target.value)}
-                      required
+                    <Label htmlFor="signup-city">
+                      City <span className="text-destructive">*</span>
+                    </Label>
+                    <CitySelector
+                      value={city}
+                      onValueChange={setCity}
+                      country={country}
+                      disabled={loading || !country}
                     />
                   </div>
                 </div>
@@ -561,7 +571,9 @@ export default function Auth() {
               ) : (
                 <form onSubmit={handleForgotPassword} className="space-y-4">
                   <div className="space-y-2">
-                    <Label htmlFor="reset-email">Email Address</Label>
+                    <Label htmlFor="reset-email">
+                      Email Address <span className="text-destructive">*</span>
+                    </Label>
                     <Input
                       id="reset-email"
                       type="email"

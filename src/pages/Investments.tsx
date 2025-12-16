@@ -7,9 +7,15 @@ import { TrendingUp, Plus, Trash2, Pencil } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useToast } from "@/hooks/use-toast";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 
 const investmentSchema = z
   .object({
@@ -28,11 +34,25 @@ const investmentsSchema = z.array(investmentSchema);
 const createInvestmentSchema = z.object({
   name: z.string().trim().min(1, "Name is required").max(100),
   type: z.string().trim().min(1, "Type is required").max(50),
-  current_value: z.coerce.number().min(0).max(1_000_000_000),
-  quantity: z.coerce.number().min(0).max(1_000_000),
-  purchase_price: z.coerce.number().min(0).max(1_000_000_000),
+  current_value: z.coerce.number().int("Must be a whole number").min(0).max(1_000_000_000),
+  quantity: z.coerce.number().int("Must be a whole number").min(1).max(1_000_000),
+  purchase_price: z.coerce.number().int("Must be a whole number").min(0).max(1_000_000_000),
   purchase_date: z.string().min(1, "Purchase date is required"),
 });
+
+const investmentTypes = [
+  "Stocks",
+  "Bonds",
+  "Mutual Funds",
+  "ETFs",
+  "Real Estate",
+  "Gold",
+  "Fixed Deposits",
+  "PPF",
+  "NPS",
+  "Cryptocurrency",
+  "Other"
+];
 
 export default function Investments() {
   const [investments, setInvestments] = useState<any[]>([]);
@@ -166,9 +186,9 @@ export default function Investments() {
     form.reset({
       name: investment.name,
       type: investment.type,
-      current_value: investment.current_value,
-      quantity: investment.quantity,
-      purchase_price: investment.purchase_price,
+      current_value: Math.round(investment.current_value),
+      quantity: Math.round(investment.quantity),
+      purchase_price: Math.round(investment.purchase_price),
       purchase_date: investment.purchase_date,
     });
     setOpen(true);
@@ -220,7 +240,7 @@ export default function Investments() {
                     name="name"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel>Investment Name</FormLabel>
+                        <FormLabel>Investment Name <span className="text-destructive">*</span></FormLabel>
                         <FormControl>
                           <Input placeholder="e.g., Apple Stock" {...field} />
                         </FormControl>
@@ -233,10 +253,21 @@ export default function Investments() {
                     name="type"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel>Type</FormLabel>
-                        <FormControl>
-                          <Input placeholder="e.g., Stocks, Bonds, Mutual Funds" {...field} />
-                        </FormControl>
+                        <FormLabel>Type <span className="text-destructive">*</span></FormLabel>
+                        <Select onValueChange={field.onChange} value={field.value}>
+                          <FormControl>
+                            <SelectTrigger>
+                              <SelectValue placeholder="Select investment type" />
+                            </SelectTrigger>
+                          </FormControl>
+                          <SelectContent className="bg-background border">
+                            {investmentTypes.map((type) => (
+                              <SelectItem key={type} value={type}>
+                                {type}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
                         <FormMessage />
                       </FormItem>
                     )}
@@ -246,9 +277,15 @@ export default function Investments() {
                     name="quantity"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel>Quantity</FormLabel>
+                        <FormLabel>Quantity <span className="text-destructive">*</span></FormLabel>
                         <FormControl>
-                          <Input type="number" step="0.01" {...field} />
+                          <Input 
+                            type="number" 
+                            step="1" 
+                            min="1"
+                            {...field} 
+                            onChange={(e) => field.onChange(e.target.value.replace(/\D/g, ''))}
+                          />
                         </FormControl>
                         <FormMessage />
                       </FormItem>
@@ -259,9 +296,15 @@ export default function Investments() {
                     name="purchase_price"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel>Purchase Price (₹)</FormLabel>
+                        <FormLabel>Purchase Price (₹) <span className="text-destructive">*</span></FormLabel>
                         <FormControl>
-                          <Input type="number" step="0.01" {...field} />
+                          <Input 
+                            type="number" 
+                            step="1" 
+                            min="0"
+                            {...field} 
+                            onChange={(e) => field.onChange(e.target.value.replace(/\D/g, ''))}
+                          />
                         </FormControl>
                         <FormMessage />
                       </FormItem>
@@ -272,9 +315,15 @@ export default function Investments() {
                     name="current_value"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel>Current Value (₹)</FormLabel>
+                        <FormLabel>Current Value (₹) <span className="text-destructive">*</span></FormLabel>
                         <FormControl>
-                          <Input type="number" step="0.01" {...field} />
+                          <Input 
+                            type="number" 
+                            step="1" 
+                            min="0"
+                            {...field} 
+                            onChange={(e) => field.onChange(e.target.value.replace(/\D/g, ''))}
+                          />
                         </FormControl>
                         <FormMessage />
                       </FormItem>
@@ -285,7 +334,7 @@ export default function Investments() {
                     name="purchase_date"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel>Purchase Date</FormLabel>
+                        <FormLabel>Purchase Date <span className="text-destructive">*</span></FormLabel>
                         <FormControl>
                           <Input type="date" {...field} />
                         </FormControl>
@@ -311,28 +360,38 @@ export default function Investments() {
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
               <CardTitle>{inv.name}</CardTitle>
               <div className="flex gap-1">
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  onClick={() => handleEdit(inv)}
-                >
-                  <Pencil className="h-4 w-4" />
-                </Button>
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  onClick={() => handleDelete(inv.id)}
-                  className="text-destructive hover:text-destructive"
-                >
-                  <Trash2 className="h-4 w-4" />
-                </Button>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      onClick={() => handleEdit(inv)}
+                    >
+                      <Pencil className="h-4 w-4" />
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent>Edit</TooltipContent>
+                </Tooltip>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      onClick={() => handleDelete(inv.id)}
+                      className="text-destructive hover:text-destructive"
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent>Delete</TooltipContent>
+                </Tooltip>
               </div>
             </CardHeader>
             <CardContent>
               <div className="space-y-2">
                 <p className="text-sm"><span className="font-semibold">Type:</span> {inv.type}</p>
-                <p className="text-sm"><span className="font-semibold">Current Value:</span> ₹{Number(inv.current_value).toFixed(2)}</p>
-                <p className="text-sm"><span className="font-semibold">Quantity:</span> {inv.quantity}</p>
+                <p className="text-sm"><span className="font-semibold">Current Value:</span> ₹{Math.round(Number(inv.current_value)).toLocaleString()}</p>
+                <p className="text-sm"><span className="font-semibold">Quantity:</span> {Math.round(inv.quantity)}</p>
               </div>
             </CardContent>
           </Card>

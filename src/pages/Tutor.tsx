@@ -4,14 +4,32 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { Send, Bot, User } from "lucide-react";
+import { Send, Bot, User, History, Plus, Trash2, MessageSquare } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
 import { FormattedMessage } from "@/components/FormattedMessage";
 import DOMPurify from 'dompurify';
+import {
+  Sheet,
+  SheetContent,
+  SheetHeader,
+  SheetTitle,
+  SheetTrigger,
+} from "@/components/ui/sheet";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 
 type Message = {
   role: "user" | "assistant";
   content: string;
+};
+
+type Conversation = {
+  id: string;
+  title: string;
+  created_at: string;
 };
 
 export default function Tutor() {
@@ -23,16 +41,88 @@ export default function Tutor() {
   ]);
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
+  const [conversations, setConversations] = useState<Conversation[]>([]);
+  const [currentConversationId, setCurrentConversationId] = useState<string | null>(null);
+  const [historyOpen, setHistoryOpen] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     scrollRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages]);
 
+  useEffect(() => {
+    fetchConversations();
+  }, []);
+
+  const fetchConversations = async () => {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return;
+
+    const { data, error } = await supabase
+      .from("chat_conversations")
+      .select("*")
+      .eq("user_id", user.id)
+      .order("updated_at", { ascending: false });
+
+    if (!error && data) {
+      setConversations(data);
+    }
+  };
+
+  const loadConversation = async (conversationId: string) => {
+    const { data, error } = await supabase
+      .from("chat_messages")
+      .select("*")
+      .eq("conversation_id", conversationId)
+      .order("created_at", { ascending: true });
+
+    if (!error && data) {
+      setMessages(data.map(msg => ({ role: msg.role as "user" | "assistant", content: msg.content })));
+      setCurrentConversationId(conversationId);
+      setHistoryOpen(false);
+    }
+  };
+
+  const startNewConversation = async () => {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return;
+
+    setMessages([
+      {
+        role: "assistant",
+        content: "Hello! I'm your AI Finance Tutor. Ask me anything about personal finance, budgeting, investing, or saving strategies!",
+      },
+    ]);
+    setCurrentConversationId(null);
+    setHistoryOpen(false);
+  };
+
+  const deleteConversation = async (conversationId: string) => {
+    const { error } = await supabase
+      .from("chat_conversations")
+      .delete()
+      .eq("id", conversationId);
+
+    if (!error) {
+      setConversations(prev => prev.filter(c => c.id !== conversationId));
+      if (currentConversationId === conversationId) {
+        startNewConversation();
+      }
+      toast({ title: "Conversation deleted" });
+    }
+  };
+
+  const saveMessage = async (conversationId: string, role: "user" | "assistant", content: string) => {
+    await supabase.from("chat_messages").insert({
+      conversation_id: conversationId,
+      role,
+      content,
+    });
+  };
+
   const sendMessage = async () => {
     if (!input.trim() || loading) return;
 
-    // Sanitize user input to prevent injection attacks
     const sanitizedInput = DOMPurify.sanitize(input, { 
       ALLOWED_TAGS: [],
       KEEP_CONTENT: true 
@@ -52,6 +142,37 @@ export default function Tutor() {
           description: "Please log in to use the AI tutor",
         });
         return;
+      }
+
+      // Create or get conversation
+      let conversationId = currentConversationId;
+      if (!conversationId) {
+        const title = sanitizedInput.slice(0, 50) + (sanitizedInput.length > 50 ? "..." : "");
+        const { data: newConv, error } = await supabase
+          .from("chat_conversations")
+          .insert({
+            user_id: session.user.id,
+            title,
+          })
+          .select()
+          .single();
+
+        if (!error && newConv) {
+          conversationId = newConv.id;
+          setCurrentConversationId(conversationId);
+          setConversations(prev => [newConv, ...prev]);
+        }
+      } else {
+        // Update conversation timestamp
+        await supabase
+          .from("chat_conversations")
+          .update({ updated_at: new Date().toISOString() })
+          .eq("id", conversationId);
+      }
+
+      // Save user message
+      if (conversationId) {
+        await saveMessage(conversationId, "user", sanitizedInput);
       }
 
       const response = await fetch(
@@ -108,6 +229,14 @@ export default function Tutor() {
           }
         }
       }
+
+      // Save assistant message
+      if (conversationId && assistantContent) {
+        await saveMessage(conversationId, "assistant", assistantContent);
+      }
+
+      // Refresh conversations list
+      fetchConversations();
     } catch (error) {
       toast({
         variant: "destructive",
@@ -122,9 +251,88 @@ export default function Tutor() {
 
   return (
     <div className="h-full flex flex-col animate-in fade-in-50 duration-500">
-      <h1 className="text-3xl font-bold bg-gradient-to-r from-primary to-secondary bg-clip-text text-transparent mb-6">
-        AI Finance Tutor
-      </h1>
+      <div className="flex justify-between items-center mb-6">
+        <h1 className="text-3xl font-bold bg-gradient-to-r from-primary to-secondary bg-clip-text text-transparent">
+          AI Finance Tutor
+        </h1>
+        <div className="flex gap-2">
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button variant="outline" size="icon" onClick={startNewConversation}>
+                <Plus className="h-4 w-4" />
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent>New Conversation</TooltipContent>
+          </Tooltip>
+          <Sheet open={historyOpen} onOpenChange={setHistoryOpen}>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <SheetTrigger asChild>
+                  <Button variant="outline" size="icon">
+                    <History className="h-4 w-4" />
+                  </Button>
+                </SheetTrigger>
+              </TooltipTrigger>
+              <TooltipContent>Chat History</TooltipContent>
+            </Tooltip>
+            <SheetContent className="w-[350px]">
+              <SheetHeader>
+                <SheetTitle className="flex items-center gap-2">
+                  <History className="h-5 w-5" />
+                  Chat History
+                </SheetTitle>
+              </SheetHeader>
+              <div className="mt-4 space-y-2">
+                {conversations.length === 0 ? (
+                  <p className="text-sm text-muted-foreground text-center py-8">
+                    No conversation history yet
+                  </p>
+                ) : (
+                  conversations.map((conv) => (
+                    <div
+                      key={conv.id}
+                      className={`flex items-center justify-between p-3 rounded-lg cursor-pointer transition-colors ${
+                        currentConversationId === conv.id
+                          ? "bg-primary/10"
+                          : "hover:bg-muted"
+                      }`}
+                    >
+                      <div
+                        className="flex-1 min-w-0"
+                        onClick={() => loadConversation(conv.id)}
+                      >
+                        <div className="flex items-center gap-2">
+                          <MessageSquare className="h-4 w-4 text-muted-foreground flex-shrink-0" />
+                          <p className="text-sm font-medium truncate">{conv.title}</p>
+                        </div>
+                        <p className="text-xs text-muted-foreground mt-1">
+                          {new Date(conv.created_at).toLocaleDateString()}
+                        </p>
+                      </div>
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-8 w-8 flex-shrink-0"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              deleteConversation(conv.id);
+                            }}
+                          >
+                            <Trash2 className="h-4 w-4 text-destructive" />
+                          </Button>
+                        </TooltipTrigger>
+                        <TooltipContent>Delete</TooltipContent>
+                      </Tooltip>
+                    </div>
+                  ))
+                )}
+              </div>
+            </SheetContent>
+          </Sheet>
+        </div>
+      </div>
 
       <Card className="flex-1 flex flex-col border-0 shadow-lg">
         <CardHeader className="border-b">
