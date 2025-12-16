@@ -6,7 +6,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
-import { Plus, Trash2, Pencil } from "lucide-react";
+import { Plus, Trash2, Pencil, DollarSign } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
 import { z } from "zod";
 import {
@@ -15,62 +15,66 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 
-type Budget = {
+type Income = {
   id: string;
-  category: string;
+  source: string;
   amount: number;
-  period: string;
-  start_date: string;
+  frequency: string;
+  date: string;
+  description: string | null;
 };
 
-const budgetSchema = z.object({
-  category: z.string()
+const incomeSchema = z.object({
+  source: z.string()
     .trim()
-    .min(1, 'Category required')
-    .max(50, 'Category too long')
-    .regex(/^[a-zA-Z0-9\s&\-]+$/, 'Invalid characters in category'),
+    .min(1, 'Source required')
+    .max(100, 'Source too long'),
   amount: z.number()
     .int('Amount must be a whole number')
     .min(1, 'Amount must be positive')
     .max(10000000, 'Amount too large'),
-  period: z.enum(['weekly', 'monthly', 'yearly']),
-  start_date: z.string()
+  frequency: z.enum(['one-time', 'weekly', 'bi-weekly', 'monthly', 'yearly']),
+  description: z.string()
+    .max(500, 'Description too long')
+    .optional(),
+  date: z.string()
 });
 
-export default function Budget() {
-  const [budgets, setBudgets] = useState<Budget[]>([]);
+export default function Income() {
+  const [incomes, setIncomes] = useState<Income[]>([]);
   const [loading, setLoading] = useState(true);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [formData, setFormData] = useState({
-    category: "",
+    source: "",
     amount: "",
-    period: "monthly",
-    start_date: new Date().toISOString().split("T")[0],
+    frequency: "monthly",
+    description: "",
+    date: new Date().toISOString().split("T")[0],
   });
 
   useEffect(() => {
-    fetchBudgets();
+    fetchIncomes();
   }, []);
 
-  const fetchBudgets = async () => {
+  const fetchIncomes = async () => {
     try {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return;
 
       const { data, error } = await supabase
-        .from("budgets")
+        .from("income")
         .select("*")
         .eq("user_id", user.id)
-        .order("created_at", { ascending: false });
+        .order("date", { ascending: false });
 
       if (error) throw error;
-      setBudgets(data || []);
+      setIncomes(data || []);
     } catch (error) {
       toast({
         variant: "destructive",
         title: "Error",
-        description: "Failed to fetch budgets",
+        description: "Failed to fetch income records",
       });
     } finally {
       setLoading(false);
@@ -80,11 +84,12 @@ export default function Budget() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    const validation = budgetSchema.safeParse({
-      category: formData.category,
+    const validation = incomeSchema.safeParse({
+      source: formData.source,
       amount: parseInt(formData.amount),
-      period: formData.period,
-      start_date: formData.start_date
+      frequency: formData.frequency,
+      description: formData.description || undefined,
+      date: formData.date
     });
     
     if (!validation.success) {
@@ -101,121 +106,138 @@ export default function Budget() {
       if (!user) return;
 
       if (editingId) {
-        const { error } = await supabase.from("budgets").update({
-          category: validation.data.category,
+        const { error } = await supabase.from("income").update({
+          source: validation.data.source,
           amount: validation.data.amount,
-          period: validation.data.period,
-          start_date: validation.data.start_date,
+          frequency: validation.data.frequency,
+          description: validation.data.description,
+          date: validation.data.date,
         }).eq("id", editingId);
 
         if (error) throw error;
 
         toast({
           title: "Success",
-          description: "Budget updated successfully",
+          description: "Income updated successfully",
         });
       } else {
-        const { error } = await supabase.from("budgets").insert({
+        const { error } = await supabase.from("income").insert({
           user_id: user.id,
-          category: validation.data.category,
+          source: validation.data.source,
           amount: validation.data.amount,
-          period: validation.data.period,
-          start_date: validation.data.start_date,
+          frequency: validation.data.frequency,
+          description: validation.data.description,
+          date: validation.data.date,
         });
 
         if (error) throw error;
 
         toast({
           title: "Success",
-          description: "Budget added successfully",
+          description: "Income added successfully",
         });
       }
 
       setDialogOpen(false);
       setEditingId(null);
       setFormData({
-        category: "",
+        source: "",
         amount: "",
-        period: "monthly",
-        start_date: new Date().toISOString().split("T")[0],
+        frequency: "monthly",
+        description: "",
+        date: new Date().toISOString().split("T")[0],
       });
-      fetchBudgets();
+      fetchIncomes();
     } catch (error) {
       toast({
         variant: "destructive",
         title: "Error",
-        description: editingId ? "Failed to update budget" : "Failed to add budget",
+        description: editingId ? "Failed to update income" : "Failed to add income",
       });
     }
   };
 
-  const handleEdit = (budget: Budget) => {
-    setEditingId(budget.id);
+  const handleEdit = (income: Income) => {
+    setEditingId(income.id);
     setFormData({
-      category: budget.category,
-      amount: Math.round(budget.amount).toString(),
-      period: budget.period,
-      start_date: budget.start_date,
+      source: income.source,
+      amount: Math.round(income.amount).toString(),
+      frequency: income.frequency,
+      description: income.description || "",
+      date: income.date,
     });
     setDialogOpen(true);
   };
 
   const handleDelete = async (id: string) => {
     try {
-      const { error } = await supabase.from("budgets").delete().eq("id", id);
+      const { error } = await supabase.from("income").delete().eq("id", id);
       if (error) throw error;
 
       toast({
         title: "Success",
-        description: "Budget deleted",
+        description: "Income deleted",
       });
-      fetchBudgets();
+      fetchIncomes();
     } catch (error) {
       toast({
         variant: "destructive",
         title: "Error",
-        description: "Failed to delete budget",
+        description: "Failed to delete income",
       });
     }
   };
+
+  const totalMonthlyIncome = incomes.reduce((total, income) => {
+    const amount = Number(income.amount);
+    switch (income.frequency) {
+      case 'weekly': return total + (amount * 4.33);
+      case 'bi-weekly': return total + (amount * 2.17);
+      case 'monthly': return total + amount;
+      case 'yearly': return total + (amount / 12);
+      case 'one-time': return total;
+      default: return total + amount;
+    }
+  }, 0);
 
   return (
     <div className="space-y-6 animate-in fade-in-50 duration-500">
       <div className="flex justify-between items-center">
         <h1 className="text-3xl font-bold bg-gradient-to-r from-primary to-secondary bg-clip-text text-transparent">
-          Budget Planner
+          Income Tracker
         </h1>
         <Dialog open={dialogOpen} onOpenChange={(open) => {
           setDialogOpen(open);
           if (!open) {
             setEditingId(null);
             setFormData({
-              category: "",
+              source: "",
               amount: "",
-              period: "monthly",
-              start_date: new Date().toISOString().split("T")[0],
+              frequency: "monthly",
+              description: "",
+              date: new Date().toISOString().split("T")[0],
             });
           }
         }}>
           <DialogTrigger asChild>
             <Button>
               <Plus className="mr-2 h-4 w-4" />
-              Add Budget
+              Add Income
             </Button>
           </DialogTrigger>
           <DialogContent>
             <DialogHeader>
-              <DialogTitle>{editingId ? "Edit Budget" : "Add New Budget"}</DialogTitle>
+              <DialogTitle>{editingId ? "Edit Income" : "Add New Income"}</DialogTitle>
             </DialogHeader>
             <form onSubmit={handleSubmit} className="space-y-4">
               <div className="space-y-2">
                 <Label>
-                  Category <span className="text-destructive">*</span>
+                  Source <span className="text-destructive">*</span>
                 </Label>
                 <Input
-                  value={formData.category}
-                  onChange={(e) => setFormData({ ...formData, category: e.target.value })}
-                  placeholder="e.g., Groceries, Rent, Entertainment"
+                  value={formData.source}
+                  onChange={(e) => setFormData({ ...formData, source: e.target.value })}
+                  placeholder="e.g., Salary, Freelance, Investments"
                   required
                 />
               </div>
@@ -235,53 +257,78 @@ export default function Budget() {
               </div>
               <div className="space-y-2">
                 <Label>
-                  Period <span className="text-destructive">*</span>
+                  Frequency <span className="text-destructive">*</span>
                 </Label>
                 <Select
-                  value={formData.period}
-                  onValueChange={(value) => setFormData({ ...formData, period: value })}
+                  value={formData.frequency}
+                  onValueChange={(value) => setFormData({ ...formData, frequency: value })}
                 >
                   <SelectTrigger>
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent className="bg-background border">
+                    <SelectItem value="one-time">One-time</SelectItem>
                     <SelectItem value="weekly">Weekly</SelectItem>
+                    <SelectItem value="bi-weekly">Bi-weekly</SelectItem>
                     <SelectItem value="monthly">Monthly</SelectItem>
                     <SelectItem value="yearly">Yearly</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
               <div className="space-y-2">
+                <Label>Description</Label>
+                <Input
+                  value={formData.description}
+                  onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+                  placeholder="Optional description"
+                />
+              </div>
+              <div className="space-y-2">
                 <Label>
-                  Start Date <span className="text-destructive">*</span>
+                  Date <span className="text-destructive">*</span>
                 </Label>
                 <Input
                   type="date"
-                  value={formData.start_date}
-                  onChange={(e) => setFormData({ ...formData, start_date: e.target.value })}
+                  value={formData.date}
+                  onChange={(e) => setFormData({ ...formData, date: e.target.value })}
                   required
                 />
               </div>
               <Button type="submit" className="w-full">
-                {editingId ? "Update Budget" : "Add Budget"}
+                {editingId ? "Update Income" : "Add Income"}
               </Button>
             </form>
           </DialogContent>
         </Dialog>
       </div>
 
+      <Card className="border-0 shadow-lg bg-gradient-to-r from-green-500/10 to-emerald-500/10">
+        <CardHeader className="pb-2">
+          <CardTitle className="text-lg flex items-center gap-2">
+            <DollarSign className="h-5 w-5 text-green-500" />
+            Total Monthly Income
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="text-3xl font-bold text-green-500">
+            ₹{Math.round(totalMonthlyIncome).toLocaleString()}
+          </div>
+          <p className="text-sm text-muted-foreground">Estimated based on frequency</p>
+        </CardContent>
+      </Card>
+
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-        {budgets.map((budget) => (
-          <Card key={budget.id} className="border-0 shadow-lg hover:shadow-xl transition-shadow">
+        {incomes.map((income) => (
+          <Card key={income.id} className="border-0 shadow-lg hover:shadow-xl transition-shadow">
             <CardHeader className="flex flex-row items-center justify-between pb-2">
-              <CardTitle className="text-lg">{budget.category}</CardTitle>
+              <CardTitle className="text-lg">{income.source}</CardTitle>
               <div className="flex gap-1">
                 <Tooltip>
                   <TooltipTrigger asChild>
                     <Button
                       variant="ghost"
                       size="icon"
-                      onClick={() => handleEdit(budget)}
+                      onClick={() => handleEdit(income)}
                     >
                       <Pencil className="h-4 w-4" />
                     </Button>
@@ -293,7 +340,7 @@ export default function Budget() {
                     <Button
                       variant="ghost"
                       size="icon"
-                      onClick={() => handleDelete(budget.id)}
+                      onClick={() => handleDelete(income.id)}
                     >
                       <Trash2 className="h-4 w-4 text-destructive" />
                     </Button>
@@ -303,25 +350,29 @@ export default function Budget() {
               </div>
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold text-primary">
-                ₹{Math.round(Number(budget.amount)).toLocaleString()}
+              <div className="text-2xl font-bold text-green-500">
+                ₹{Math.round(Number(income.amount)).toLocaleString()}
               </div>
               <p className="text-sm text-muted-foreground capitalize">
-                {budget.period}
+                {income.frequency}
               </p>
+              {income.description && (
+                <p className="text-sm text-muted-foreground mt-1">{income.description}</p>
+              )}
               <p className="text-xs text-muted-foreground mt-2">
-                Start: {new Date(budget.start_date).toLocaleDateString()}
+                {new Date(income.date).toLocaleDateString()}
               </p>
             </CardContent>
           </Card>
         ))}
       </div>
 
-      {!loading && budgets.length === 0 && (
+      {!loading && incomes.length === 0 && (
         <Card className="border-2 border-dashed">
           <CardContent className="flex flex-col items-center justify-center py-12">
+            <DollarSign className="h-12 w-12 text-muted-foreground mb-4" />
             <p className="text-muted-foreground text-center">
-              No budgets yet. Click "Add Budget" to get started!
+              No income records yet. Click "Add Income" to get started!
             </p>
           </CardContent>
         </Card>

@@ -9,6 +9,7 @@ import Dashboard from "./pages/Dashboard";
 import Tutor from "./pages/Tutor";
 import Budget from "./pages/Budget";
 import Expenses from "./pages/Expenses";
+import Income from "./pages/Income";
 import Investments from "./pages/Investments";
 import Goals from "./pages/Goals";
 import Reports from "./pages/Reports";
@@ -31,6 +32,7 @@ const App = () => (
             <Route path="/tutor" element={<Tutor />} />
             <Route path="/budget" element={<Budget />} />
             <Route path="/expenses" element={<Expenses />} />
+            <Route path="/income" element={<Income />} />
             <Route path="/investments" element={<Investments />} />
             <Route path="/goals" element={<Goals />} />
             <Route path="/reports" element={<Reports />} />

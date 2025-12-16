@@ -5,12 +5,11 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { User, Key, Mail, Camera } from "lucide-react";
+import { User, Key, Mail, Camera, Trash2 } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
-
 import {
   Form,
   FormControl,
@@ -21,13 +20,31 @@ import {
 } from "@/components/ui/form";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { CountryCodeSelector } from "@/components/CountryCodeSelector";
+import { CountrySelector } from "@/components/CountrySelector";
+import { CitySelector } from "@/components/CitySelector";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
 
 const profileSchema = z.object({
   full_name: z.string().trim().min(1, "Full name is required").max(100, "Full name must be less than 100 characters").regex(/^[a-zA-Z\s'-]+$/, "Full name can only contain letters, spaces, hyphens, and apostrophes"),
   display_name: z.string().trim().min(1, "Display name is required").max(50, "Display name must be less than 50 characters"),
   email: z.string().email(),
   recovery_email: z.string().email("Please enter a valid email address").optional().or(z.literal("")),
-  mobile_number: z.string().trim().regex(/^\+[1-9]\d{1,14}$/, "Phone number must start with + followed by country code and 1-14 digits (e.g., +14155552671)").optional().or(z.literal("")),
+  mobile_number: z.string().trim().regex(/^\+[1-9]\d{6,14}$/, "Phone number must be 7-15 digits with country code").optional().or(z.literal("")),
   profession: z.string().trim().max(100, "Profession must be less than 100 characters").optional().or(z.literal("")),
   city: z.string().trim().max(100, "City must be less than 100 characters").optional().or(z.literal("")),
   country: z.string().trim().max(100, "Country must be less than 100 characters").optional().or(z.literal("")),
@@ -63,6 +80,8 @@ export default function Settings() {
       bio: "",
     },
   });
+
+  const watchCountry = form.watch("country");
 
   useEffect(() => {
     fetchProfile();
@@ -172,6 +191,23 @@ export default function Settings() {
     }
   };
 
+  const handleDeleteAvatar = async () => {
+    try {
+      const { error } = await supabase
+        .from('profiles')
+        .update({ avatar_url: null })
+        .eq('id', userId);
+
+      if (error) throw error;
+
+      setAvatarUrl(null);
+      toast({ title: "Profile picture removed successfully!" });
+    } catch (error) {
+      console.error('Error deleting avatar:', error);
+      toast({ variant: "destructive", title: "Failed to remove profile picture" });
+    }
+  };
+
   const handlePasswordReset = async () => {
     const email = form.getValues('email');
     if (!email) {
@@ -187,18 +223,15 @@ export default function Settings() {
       redirectTo: `${window.location.origin}/auth`,
     });
 
-    // Log error for debugging but don't expose details to user
     if (error) {
       console.error('Password reset error:', error.code, error.message);
     }
 
-    // Always show generic success message to prevent account enumeration
     toast({
       title: "Password reset requested",
       description: "If an account exists with this email, you'll receive a password reset link.",
     });
   };
-
 
   return (
     <div className="space-y-6">
@@ -222,22 +255,50 @@ export default function Settings() {
                 {form.getValues('display_name')?.charAt(0)?.toUpperCase() || <User className="h-10 w-10" />}
               </AvatarFallback>
             </Avatar>
-            <div className="flex-1">
-              <Label htmlFor="avatar-upload" className="cursor-pointer">
-                <div className="flex items-center gap-2 px-4 py-2 bg-primary text-primary-foreground rounded-md hover:bg-primary/90 transition-colors w-fit">
-                  <Camera className="h-4 w-4" />
-                  {uploading ? "Uploading..." : "Change Picture"}
-                </div>
-                <Input
-                  id="avatar-upload"
-                  type="file"
-                  accept="image/*"
-                  onChange={handleAvatarUpload}
-                  disabled={uploading}
-                  className="hidden"
-                />
-              </Label>
-              <p className="text-sm text-muted-foreground mt-2">
+            <div className="flex-1 space-y-2">
+              <div className="flex gap-2">
+                <Label htmlFor="avatar-upload" className="cursor-pointer">
+                  <div className="flex items-center gap-2 px-4 py-2 bg-primary text-primary-foreground rounded-md hover:bg-primary/90 transition-colors w-fit">
+                    <Camera className="h-4 w-4" />
+                    {uploading ? "Uploading..." : "Change Picture"}
+                  </div>
+                  <Input
+                    id="avatar-upload"
+                    type="file"
+                    accept="image/*"
+                    onChange={handleAvatarUpload}
+                    disabled={uploading}
+                    className="hidden"
+                  />
+                </Label>
+                {avatarUrl && (
+                  <AlertDialog>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <AlertDialogTrigger asChild>
+                          <Button variant="destructive" size="icon">
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        </AlertDialogTrigger>
+                      </TooltipTrigger>
+                      <TooltipContent>Delete Profile Picture</TooltipContent>
+                    </Tooltip>
+                    <AlertDialogContent>
+                      <AlertDialogHeader>
+                        <AlertDialogTitle>Remove Profile Picture?</AlertDialogTitle>
+                        <AlertDialogDescription>
+                          This will remove your current profile picture. You can upload a new one anytime.
+                        </AlertDialogDescription>
+                      </AlertDialogHeader>
+                      <AlertDialogFooter>
+                        <AlertDialogCancel>Cancel</AlertDialogCancel>
+                        <AlertDialogAction onClick={handleDeleteAvatar}>Remove</AlertDialogAction>
+                      </AlertDialogFooter>
+                    </AlertDialogContent>
+                  </AlertDialog>
+                )}
+              </div>
+              <p className="text-sm text-muted-foreground">
                 JPG, PNG or GIF. Max size 5MB.
               </p>
             </div>
@@ -261,7 +322,9 @@ export default function Settings() {
                   name="full_name"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Full Name</FormLabel>
+                      <FormLabel>
+                        Full Name <span className="text-destructive">*</span>
+                      </FormLabel>
                       <FormControl>
                         <Input placeholder="John Doe" {...field} />
                       </FormControl>
@@ -274,7 +337,9 @@ export default function Settings() {
                   name="display_name"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Display Name</FormLabel>
+                      <FormLabel>
+                        Display Name <span className="text-destructive">*</span>
+                      </FormLabel>
                       <FormControl>
                         <Input placeholder="Johnny" {...field} />
                       </FormControl>
@@ -326,36 +391,28 @@ export default function Settings() {
                         <CountryCodeSelector
                           value={field.value || ""}
                           onSelect={(code) => {
-                            // Extract the number part (remove old country code if present)
                             const currentValue = field.value || "";
                             let numberPart = currentValue;
                             
-                            // Remove existing country code if present
                             if (currentValue.startsWith("+")) {
-                              // Find where the country code ends (first non-digit after +)
                               const match = currentValue.match(/^\+\d+/);
                               if (match) {
                                 numberPart = currentValue.substring(match[0].length);
                               }
                             }
                             
-                            // Set new value with selected country code
                             field.onChange(code + numberPart);
                           }}
                           disabled={form.formState.isSubmitting}
                         />
                         <FormControl>
                           <Input 
-                            placeholder="4155552671" 
-                            {...field}
+                            placeholder="1234567890" 
                             value={field.value?.replace(/^\+\d+/, '') || ''}
                             onChange={(e) => {
-                              // Get current country code
                               const currentValue = field.value || "+1";
                               const match = currentValue.match(/^\+\d+/);
                               const countryCode = match ? match[0] : "+1";
-                              
-                              // Remove non-digits from input
                               const digits = e.target.value.replace(/\D/g, '');
                               field.onChange(countryCode + digits);
                             }}
@@ -363,9 +420,6 @@ export default function Settings() {
                         </FormControl>
                       </div>
                       <FormMessage />
-                      <p className="text-sm text-muted-foreground">
-                        Required for phone-based password reset. Select country code and enter number.
-                      </p>
                     </FormItem>
                   )}
                 />
@@ -401,12 +455,19 @@ export default function Settings() {
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <FormField
                   control={form.control}
-                  name="city"
+                  name="country"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>City</FormLabel>
+                      <FormLabel>Country</FormLabel>
                       <FormControl>
-                        <Input placeholder="New York" {...field} />
+                        <CountrySelector
+                          value={field.value || ""}
+                          onValueChange={(value) => {
+                            field.onChange(value);
+                            form.setValue("city", "");
+                          }}
+                          disabled={form.formState.isSubmitting}
+                        />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
@@ -414,12 +475,17 @@ export default function Settings() {
                 />
                 <FormField
                   control={form.control}
-                  name="country"
+                  name="city"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Country</FormLabel>
+                      <FormLabel>City</FormLabel>
                       <FormControl>
-                        <Input placeholder="USA" {...field} />
+                        <CitySelector
+                          value={field.value || ""}
+                          onValueChange={field.onChange}
+                          country={watchCountry || ""}
+                          disabled={form.formState.isSubmitting}
+                        />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
@@ -466,16 +532,19 @@ export default function Settings() {
               <div>
                 <p className="font-medium">Password Reset</p>
                 <p className="text-sm text-muted-foreground">
-                  Reset your password via email
+                  We'll send a reset link to your email
                 </p>
               </div>
             </div>
-            <Button onClick={handlePasswordReset} variant="destructive" className="w-full">
+            <Button
+              variant="destructive"
+              onClick={handlePasswordReset}
+              className="w-full"
+            >
               <Mail className="h-4 w-4 mr-2" />
-              Send Email Reset Link
+              Send Password Reset Email
             </Button>
           </div>
-
         </CardContent>
       </Card>
     </div>
