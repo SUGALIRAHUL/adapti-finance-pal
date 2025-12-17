@@ -44,7 +44,7 @@ const profileSchema = z.object({
   display_name: z.string().trim().min(1, "Display name is required").max(50, "Display name must be less than 50 characters"),
   email: z.string().email(),
   recovery_email: z.string().email("Please enter a valid email address").optional().or(z.literal("")),
-  mobile_number: z.string().trim().regex(/^\+[1-9]\d{6,14}$/, "Phone number must be 7-15 digits with country code").optional().or(z.literal("")),
+  mobile_number: z.string().trim().min(8, "Phone number must be at least 8 characters").max(20, "Phone number too long").optional().or(z.literal("")),
   profession: z.string().trim().max(100, "Profession must be less than 100 characters").optional().or(z.literal("")),
   city: z.string().trim().max(100, "City must be less than 100 characters").optional().or(z.literal("")),
   country: z.string().trim().max(100, "Country must be less than 100 characters").optional().or(z.literal("")),
