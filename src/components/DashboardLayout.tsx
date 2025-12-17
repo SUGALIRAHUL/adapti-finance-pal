@@ -14,6 +14,7 @@ import {
   LogOut,
   Menu,
   X,
+  Receipt,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
@@ -25,7 +26,7 @@ const navigation = [
   { name: "AI Tutor", path: "/tutor", icon: GraduationCap },
   { name: "Budget", path: "/budget", icon: Wallet },
   { name: "Income", path: "/income", icon: TrendingUp },
-  { name: "Expenses", path: "/expenses", icon: Wallet },
+  { name: "Expenses", path: "/expenses", icon: Receipt },
   { name: "Investments", path: "/investments", icon: LineChart },
   { name: "Goals", path: "/goals", icon: Target },
   { name: "Reports", path: "/reports", icon: BarChart3 },
