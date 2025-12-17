@@ -144,6 +144,36 @@ export type Database = {
           },
         ]
       }
+      email_otp: {
+        Row: {
+          created_at: string
+          email: string
+          expires_at: string
+          id: string
+          otp_code: string
+          type: string
+          verified: boolean | null
+        }
+        Insert: {
+          created_at?: string
+          email: string
+          expires_at: string
+          id?: string
+          otp_code: string
+          type?: string
+          verified?: boolean | null
+        }
+        Update: {
+          created_at?: string
+          email?: string
+          expires_at?: string
+          id?: string
+          otp_code?: string
+          type?: string
+          verified?: boolean | null
+        }
+        Relationships: []
+      }
       expenses: {
         Row: {
           amount: number

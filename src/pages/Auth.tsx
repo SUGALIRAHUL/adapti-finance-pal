@@ -8,11 +8,12 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { toast } from "@/hooks/use-toast";
 import { z } from "zod";
-import { Mail, UserCircle } from "lucide-react";
+import { Mail, UserCircle, Loader2 } from "lucide-react";
 import { CountryCodeSelector } from "@/components/CountryCodeSelector";
 import { CountrySelector } from "@/components/CountrySelector";
 import { CitySelector } from "@/components/CitySelector";
 import { PasswordInput } from "@/components/PasswordInput";
+import { InputOTP, InputOTPGroup, InputOTPSlot } from "@/components/ui/input-otp";
 
 const signupSchema = z.object({
   email: z.string().email('Invalid email address').max(255, 'Email too long'),
@@ -33,7 +34,8 @@ const signupSchema = z.object({
     .max(50, 'Display name too long'),
   mobileNumber: z.string()
     .trim()
-    .regex(/^\+[1-9]\d{6,14}$/, 'Phone number must be 7-15 digits with country code'),
+    .min(8, 'Phone number must be at least 8 characters')
+    .max(20, 'Phone number too long'),
   profession: z.string()
     .trim()
     .min(1, 'Profession required')
@@ -62,6 +64,9 @@ const loginSchema = z.object({
   password: z.string().min(1, 'Password required')
 });
 
+type AuthStep = 'credentials' | 'otp';
+type SignupStep = 'email-verify' | 'details' | 'complete';
+
 export default function Auth() {
   const navigate = useNavigate();
   const [loading, setLoading] = useState(false);
@@ -69,7 +74,8 @@ export default function Auth() {
   const [password, setPassword] = useState("");
   const [fullName, setFullName] = useState("");
   const [displayName, setDisplayName] = useState("");
-  const [mobileNumber, setMobileNumber] = useState("+1");
+  const [countryCode, setCountryCode] = useState("+1");
+  const [phoneNumber, setPhoneNumber] = useState("");
   const [profession, setProfession] = useState("");
   const [city, setCity] = useState("");
   const [country, setCountry] = useState("");
@@ -80,6 +86,13 @@ export default function Auth() {
   const [isPasswordReset, setIsPasswordReset] = useState(false);
   const [newPassword, setNewPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
+  
+  // OTP states
+  const [loginStep, setLoginStep] = useState<AuthStep>('credentials');
+  const [signupStep, setSignupStep] = useState<SignupStep>('email-verify');
+  const [otp, setOtp] = useState("");
+  const [signupOtp, setSignupOtp] = useState("");
+  const [signupData, setSignupData] = useState<any>(null);
 
   useEffect(() => {
     const hashParams = new URLSearchParams(window.location.hash.substring(1));
@@ -89,6 +102,35 @@ export default function Auth() {
       setIsPasswordReset(true);
     }
   }, []);
+
+  const sendOtp = async (targetEmail: string, type: 'login' | 'signup') => {
+    try {
+      const { data, error } = await supabase.functions.invoke('send-otp', {
+        body: { email: targetEmail, type }
+      });
+      
+      if (error) throw error;
+      return { success: true };
+    } catch (error: any) {
+      console.error('Error sending OTP:', error);
+      return { success: false, error: error.message };
+    }
+  };
+
+  const verifyOtp = async (targetEmail: string, otpCode: string, type: 'login' | 'signup') => {
+    try {
+      const { data, error } = await supabase.functions.invoke('verify-otp', {
+        body: { email: targetEmail, otp: otpCode, type }
+      });
+      
+      if (error) throw error;
+      if (data.error) throw new Error(data.error);
+      return { success: true };
+    } catch (error: any) {
+      console.error('Error verifying OTP:', error);
+      return { success: false, error: error.message };
+    }
+  };
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -105,6 +147,7 @@ export default function Auth() {
 
     setLoading(true);
 
+    // First verify credentials
     const { error } = await supabase.auth.signInWithPassword({
       email: validation.data.email,
       password: validation.data.password,
@@ -117,6 +160,72 @@ export default function Auth() {
         title: "Authentication failed",
         description: "Invalid email or password. Please try again.",
       });
+      setLoading(false);
+      return;
+    }
+
+    // Sign out temporarily to require OTP verification
+    await supabase.auth.signOut();
+
+    // Send OTP
+    const result = await sendOtp(validation.data.email, 'login');
+    
+    if (!result.success) {
+      toast({
+        variant: "destructive",
+        title: "Error",
+        description: result.error || "Failed to send verification code",
+      });
+      setLoading(false);
+      return;
+    }
+
+    toast({
+      title: "Verification Code Sent",
+      description: "Please check your email for the 6-digit code.",
+    });
+    
+    setLoginStep('otp');
+    setLoading(false);
+  };
+
+  const handleLoginOtpVerify = async () => {
+    if (otp.length !== 6) {
+      toast({
+        variant: "destructive",
+        title: "Invalid Code",
+        description: "Please enter the complete 6-digit code.",
+      });
+      return;
+    }
+
+    setLoading(true);
+
+    const result = await verifyOtp(email, otp, 'login');
+    
+    if (!result.success) {
+      toast({
+        variant: "destructive",
+        title: "Verification Failed",
+        description: result.error || "Invalid or expired code.",
+      });
+      setLoading(false);
+      return;
+    }
+
+    // Now actually sign in
+    const { error } = await supabase.auth.signInWithPassword({
+      email,
+      password,
+    });
+
+    if (error) {
+      toast({
+        variant: "destructive",
+        title: "Login Failed",
+        description: "Unable to complete login. Please try again.",
+      });
+      setLoginStep('credentials');
     } else {
       toast({
         title: "Welcome back!",
@@ -128,8 +237,111 @@ export default function Auth() {
     setLoading(false);
   };
 
-  const handleSignup = async (e: React.FormEvent) => {
+  const handleSendSignupOtp = async (e: React.FormEvent) => {
     e.preventDefault();
+    
+    if (!email || !z.string().email().safeParse(email).success) {
+      toast({
+        variant: "destructive",
+        title: "Invalid Email",
+        description: "Please enter a valid email address.",
+      });
+      return;
+    }
+
+    setLoading(true);
+
+    const result = await sendOtp(email, 'signup');
+    
+    if (!result.success) {
+      toast({
+        variant: "destructive",
+        title: "Error",
+        description: result.error || "Failed to send verification code",
+      });
+      setLoading(false);
+      return;
+    }
+
+    toast({
+      title: "Verification Code Sent",
+      description: "Please check your email for the 6-digit code.",
+    });
+    
+    setSignupStep('details');
+    setLoading(false);
+  };
+
+  const handleVerifySignupOtp = async () => {
+    if (signupOtp.length !== 6) {
+      toast({
+        variant: "destructive",
+        title: "Invalid Code",
+        description: "Please enter the complete 6-digit code.",
+      });
+      return;
+    }
+
+    setLoading(true);
+
+    const result = await verifyOtp(email, signupOtp, 'signup');
+    
+    if (!result.success) {
+      toast({
+        variant: "destructive",
+        title: "Verification Failed",
+        description: result.error || "Invalid or expired code.",
+      });
+      setLoading(false);
+      return;
+    }
+
+    // Now complete the signup
+    const mobileNumber = `${countryCode}${phoneNumber}`;
+    
+    const { error } = await supabase.auth.signUp({
+      email: signupData.email,
+      password: signupData.password,
+      options: {
+        emailRedirectTo: `${window.location.origin}/dashboard`,
+        data: {
+          full_name: signupData.fullName,
+          display_name: signupData.displayName,
+          mobile_number: mobileNumber,
+          profession: signupData.profession,
+          city: signupData.city,
+          country: signupData.country,
+          date_of_birth: signupData.dateOfBirth,
+          bio: signupData.bio,
+        },
+      },
+    });
+
+    if (error) {
+      console.error('Signup error:', error.code, error.message);
+      toast({
+        variant: "destructive",
+        title: "Account creation failed",
+        description: error.message || "Unable to create account. Please try again.",
+      });
+    } else {
+      toast({
+        title: "Account created!",
+        description: "Welcome to PERSFIN. You can now log in.",
+      });
+      setSignupStep('email-verify');
+      setEmail("");
+      setPassword("");
+      setSignupOtp("");
+    }
+
+    setLoading(false);
+  };
+
+  const handleSignupDetails = async (e: React.FormEvent) => {
+    e.preventDefault();
+    
+    const mobileNumber = `${countryCode}${phoneNumber}`;
     
     const validation = signupSchema.safeParse({ 
       email, 
@@ -143,6 +355,7 @@ export default function Auth() {
       dateOfBirth,
       bio
     });
+    
     if (!validation.success) {
       toast({
         variant: "destructive",
@@ -152,41 +365,20 @@ export default function Auth() {
       return;
     }
 
-    setLoading(true);
-
-    const { error } = await supabase.auth.signUp({
+    // Store signup data for later
+    setSignupData({
       email: validation.data.email,
       password: validation.data.password,
-      options: {
-        emailRedirectTo: `${window.location.origin}/dashboard`,
-        data: {
-          full_name: validation.data.fullName,
-          display_name: validation.data.displayName,
-          mobile_number: validation.data.mobileNumber,
-          profession: validation.data.profession,
-          city: validation.data.city,
-          country: validation.data.country,
-          date_of_birth: validation.data.dateOfBirth,
-          bio: validation.data.bio,
-        },
-      },
+      fullName: validation.data.fullName,
+      displayName: validation.data.displayName,
+      profession: validation.data.profession,
+      city: validation.data.city,
+      country: validation.data.country,
+      dateOfBirth: validation.data.dateOfBirth,
+      bio: validation.data.bio,
     });
-
-    if (error) {
-      console.error('Signup error:', error.code, error.message);
-      toast({
-        variant: "destructive",
-        title: "Account creation failed",
-        description: "Unable to create account. Please try again or contact support.",
-      });
-    } else {
-      toast({
-        title: "Account created!",
-        description: "Welcome to PERSFIN. You can now log in.",
-      });
-    }
-
-    setLoading(false);
+    
+    setSignupStep('complete');
   };
 
   const handleForgotPassword = async (e: React.FormEvent) => {
@@ -275,6 +467,25 @@ export default function Auth() {
     }
   };
 
+  const resendOtp = async (type: 'login' | 'signup') => {
+    setLoading(true);
+    const result = await sendOtp(email, type);
+    
+    if (result.success) {
+      toast({
+        title: "Code Resent",
+        description: "A new verification code has been sent to your email.",
+      });
+    } else {
+      toast({
+        variant: "destructive",
+        title: "Error",
+        description: result.error || "Failed to resend code.",
+      });
+    }
+    setLoading(false);
+  };
+
   if (isPasswordReset) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-primary/20 via-accent/10 to-secondary/20 p-4">
@@ -346,204 +557,372 @@ export default function Auth() {
         <CardContent>
           <Tabs defaultValue="login" className="w-full">
             <TabsList className="grid w-full grid-cols-3">
-              <TabsTrigger value="login">Login</TabsTrigger>
-              <TabsTrigger value="signup">Sign Up</TabsTrigger>
+              <TabsTrigger value="login" onClick={() => { setLoginStep('credentials'); setOtp(''); }}>Login</TabsTrigger>
+              <TabsTrigger value="signup" onClick={() => { setSignupStep('email-verify'); setSignupOtp(''); }}>Sign Up</TabsTrigger>
               <TabsTrigger value="forgot">Forgot Password</TabsTrigger>
             </TabsList>
+            
+            {/* LOGIN TAB */}
             <TabsContent value="login">
-              <form onSubmit={handleLogin} className="space-y-4">
-                <div className="space-y-2">
-                  <Label htmlFor="login-email">
-                    Email <span className="text-destructive">*</span>
-                  </Label>
-                  <Input
-                    id="login-email"
-                    type="email"
-                    placeholder="your@email.com"
-                    value={email}
-                    onChange={(e) => setEmail(e.target.value)}
-                    required
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="login-password">
-                    Password <span className="text-destructive">*</span>
-                  </Label>
-                  <PasswordInput
-                    id="login-password"
-                    value={password}
-                    onChange={(e) => setPassword(e.target.value)}
-                    placeholder="Enter your password"
-                    required
-                  />
-                </div>
-                <Button type="submit" className="w-full" disabled={loading}>
-                  {loading ? "Logging in..." : "Login"}
-                </Button>
-              </form>
-            </TabsContent>
-            <TabsContent value="signup">
-              <form onSubmit={handleSignup} className="space-y-4">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {loginStep === 'credentials' ? (
+                <form onSubmit={handleLogin} className="space-y-4">
                   <div className="space-y-2">
-                    <Label htmlFor="signup-name">
-                      Full Name <span className="text-destructive">*</span>
+                    <Label htmlFor="login-email">
+                      Email <span className="text-destructive">*</span>
                     </Label>
                     <Input
-                      id="signup-name"
-                      type="text"
-                      placeholder="John Doe"
-                      value={fullName}
-                      onChange={(e) => setFullName(e.target.value)}
+                      id="login-email"
+                      type="email"
+                      placeholder="your@email.com"
+                      value={email}
+                      onChange={(e) => setEmail(e.target.value)}
                       required
                     />
                   </div>
                   <div className="space-y-2">
-                    <Label htmlFor="signup-display-name">
-                      Display Name <span className="text-destructive">*</span>
+                    <Label htmlFor="login-password">
+                      Password <span className="text-destructive">*</span>
                     </Label>
-                    <Input
-                      id="signup-display-name"
-                      type="text"
-                      placeholder="Johnny"
-                      value={displayName}
-                      onChange={(e) => setDisplayName(e.target.value)}
+                    <PasswordInput
+                      id="login-password"
+                      value={password}
+                      onChange={(e) => setPassword(e.target.value)}
+                      placeholder="Enter your password"
                       required
                     />
                   </div>
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="signup-email">
-                    Email <span className="text-destructive">*</span>
-                  </Label>
-                  <Input
-                    id="signup-email"
-                    type="email"
-                    placeholder="your@email.com"
-                    value={email}
-                    onChange={(e) => setEmail(e.target.value)}
-                    required
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="signup-password">
-                    Password <span className="text-destructive">*</span>
-                  </Label>
-                  <PasswordInput
-                    id="signup-password"
-                    value={password}
-                    onChange={(e) => setPassword(e.target.value)}
-                    placeholder="Enter your password"
-                    required
-                    minLength={8}
-                    showStrength
-                  />
-                </div>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="signup-mobile">
-                      Mobile Number <span className="text-destructive">*</span>
-                    </Label>
-                    <div className="flex gap-2">
-                      <CountryCodeSelector
-                        value={mobileNumber}
-                        onSelect={(code) => {
-                          const currentValue = mobileNumber || "+1";
-                          const match = currentValue.match(/^\+\d+/);
-                          let numberPart = "";
-                          if (match) {
-                            numberPart = currentValue.substring(match[0].length);
-                          }
-                          setMobileNumber(code + numberPart);
-                        }}
-                        disabled={loading}
-                      />
-                      <Input
-                        id="signup-mobile"
-                        type="tel"
-                        placeholder="1234567890"
-                        value={mobileNumber.replace(/^\+\d+/, '')}
-                        onChange={(e) => {
-                          const currentValue = mobileNumber || "+1";
-                          const match = currentValue.match(/^\+\d+/);
-                          const countryCode = match ? match[0] : "+1";
-                          const digits = e.target.value.replace(/\D/g, '');
-                          setMobileNumber(countryCode + digits);
-                        }}
-                        required
-                      />
+                  <Button type="submit" className="w-full" disabled={loading}>
+                    {loading ? (
+                      <>
+                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                        Verifying...
+                      </>
+                    ) : (
+                      "Login"
+                    )}
+                  </Button>
+                </form>
+              ) : (
+                <div className="space-y-6 py-4">
+                  <div className="text-center space-y-2">
+                    <div className="h-16 w-16 rounded-full bg-primary/10 flex items-center justify-center mx-auto">
+                      <Mail className="h-8 w-8 text-primary" />
                     </div>
-                    <p className="text-xs text-muted-foreground">
-                      Select country code and enter phone number
+                    <h3 className="text-xl font-semibold">Enter Verification Code</h3>
+                    <p className="text-muted-foreground text-sm">
+                      We sent a 6-digit code to <strong>{email}</strong>
+                    </p>
+                  </div>
+                  
+                  <div className="flex justify-center">
+                    <InputOTP maxLength={6} value={otp} onChange={setOtp}>
+                      <InputOTPGroup>
+                        <InputOTPSlot index={0} />
+                        <InputOTPSlot index={1} />
+                        <InputOTPSlot index={2} />
+                        <InputOTPSlot index={3} />
+                        <InputOTPSlot index={4} />
+                        <InputOTPSlot index={5} />
+                      </InputOTPGroup>
+                    </InputOTP>
+                  </div>
+
+                  <Button 
+                    onClick={handleLoginOtpVerify} 
+                    className="w-full" 
+                    disabled={loading || otp.length !== 6}
+                  >
+                    {loading ? (
+                      <>
+                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                        Verifying...
+                      </>
+                    ) : (
+                      "Verify & Login"
+                    )}
+                  </Button>
+
+                  <div className="flex justify-between items-center text-sm">
+                    <Button 
+                      variant="link" 
+                      className="p-0 h-auto"
+                      onClick={() => resendOtp('login')}
+                      disabled={loading}
+                    >
+                      Resend Code
+                    </Button>
+                    <Button 
+                      variant="link" 
+                      className="p-0 h-auto"
+                      onClick={() => { setLoginStep('credentials'); setOtp(''); }}
+                    >
+                      Back to Login
+                    </Button>
+                  </div>
+                </div>
+              )}
+            </TabsContent>
+            
+            {/* SIGNUP TAB */}
+            <TabsContent value="signup">
+              {signupStep === 'email-verify' && (
+                <form onSubmit={handleSendSignupOtp} className="space-y-4">
+                  <div className="text-center py-4">
+                    <h3 className="text-lg font-semibold mb-2">Step 1: Verify Your Email</h3>
+                    <p className="text-muted-foreground text-sm">
+                      Enter your email address to receive a verification code
                     </p>
                   </div>
                   <div className="space-y-2">
-                    <Label htmlFor="signup-dob">
-                      Date of Birth <span className="text-destructive">*</span>
+                    <Label htmlFor="signup-email">
+                      Email <span className="text-destructive">*</span>
                     </Label>
                     <Input
-                      id="signup-dob"
-                      type="date"
-                      value={dateOfBirth}
-                      onChange={(e) => setDateOfBirth(e.target.value)}
+                      id="signup-email"
+                      type="email"
+                      placeholder="your@email.com"
+                      value={email}
+                      onChange={(e) => setEmail(e.target.value)}
                       required
                     />
                   </div>
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="signup-profession">
-                    Profession <span className="text-destructive">*</span>
-                  </Label>
-                  <Input
-                    id="signup-profession"
-                    type="text"
-                    placeholder="Software Engineer"
-                    value={profession}
-                    onChange={(e) => setProfession(e.target.value)}
-                    required
-                  />
-                </div>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <Button type="submit" className="w-full" disabled={loading}>
+                    {loading ? (
+                      <>
+                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                        Sending Code...
+                      </>
+                    ) : (
+                      "Send Verification Code"
+                    )}
+                  </Button>
+                </form>
+              )}
+
+              {signupStep === 'details' && (
+                <form onSubmit={handleSignupDetails} className="space-y-4">
+                  <div className="text-center py-2">
+                    <h3 className="text-lg font-semibold mb-1">Step 2: Complete Your Profile</h3>
+                    <p className="text-muted-foreground text-sm">
+                      Fill in your details to create your account
+                    </p>
+                  </div>
+                  
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <Label htmlFor="signup-name">
+                        Full Name <span className="text-destructive">*</span>
+                      </Label>
+                      <Input
+                        id="signup-name"
+                        type="text"
+                        placeholder="John Doe"
+                        value={fullName}
+                        onChange={(e) => setFullName(e.target.value)}
+                        required
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="signup-display-name">
+                        Display Name <span className="text-destructive">*</span>
+                      </Label>
+                      <Input
+                        id="signup-display-name"
+                        type="text"
+                        placeholder="Johnny"
+                        value={displayName}
+                        onChange={(e) => setDisplayName(e.target.value)}
+                        required
+                      />
+                    </div>
+                  </div>
+                  
                   <div className="space-y-2">
-                    <Label htmlFor="signup-country">
-                      Country <span className="text-destructive">*</span>
+                    <Label htmlFor="signup-password">
+                      Password <span className="text-destructive">*</span>
                     </Label>
-                    <CountrySelector
-                      value={country}
-                      onValueChange={(value) => {
-                        setCountry(value);
-                        setCity(""); // Reset city when country changes
-                      }}
+                    <PasswordInput
+                      id="signup-password"
+                      value={password}
+                      onChange={(e) => setPassword(e.target.value)}
+                      placeholder="Enter your password"
+                      required
+                      minLength={8}
+                      showStrength
+                    />
+                  </div>
+                  
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <Label htmlFor="signup-mobile">
+                        Mobile Number <span className="text-destructive">*</span>
+                      </Label>
+                      <div className="flex gap-2">
+                        <CountryCodeSelector
+                          value={countryCode}
+                          onSelect={setCountryCode}
+                          disabled={loading}
+                        />
+                        <Input
+                          id="signup-mobile"
+                          type="tel"
+                          placeholder="1234567890"
+                          value={phoneNumber}
+                          onChange={(e) => {
+                            const digits = e.target.value.replace(/\D/g, '');
+                            setPhoneNumber(digits);
+                          }}
+                          required
+                        />
+                      </div>
+                      <p className="text-xs text-muted-foreground">
+                        Select country code and enter phone number
+                      </p>
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="signup-dob">
+                        Date of Birth <span className="text-destructive">*</span>
+                      </Label>
+                      <Input
+                        id="signup-dob"
+                        type="date"
+                        value={dateOfBirth}
+                        onChange={(e) => setDateOfBirth(e.target.value)}
+                        required
+                      />
+                    </div>
+                  </div>
+                  
+                  <div className="space-y-2">
+                    <Label htmlFor="signup-profession">
+                      Profession <span className="text-destructive">*</span>
+                    </Label>
+                    <Input
+                      id="signup-profession"
+                      type="text"
+                      placeholder="Software Engineer"
+                      value={profession}
+                      onChange={(e) => setProfession(e.target.value)}
+                      required
+                    />
+                  </div>
+                  
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <Label htmlFor="signup-country">
+                        Country <span className="text-destructive">*</span>
+                      </Label>
+                      <CountrySelector
+                        value={country}
+                        onValueChange={(value) => {
+                          setCountry(value);
+                          setCity("");
+                        }}
+                        disabled={loading}
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="signup-city">
+                        City <span className="text-destructive">*</span>
+                      </Label>
+                      <CitySelector
+                        value={city}
+                        onValueChange={setCity}
+                        country={country}
+                        disabled={loading || !country}
+                      />
+                    </div>
+                  </div>
+                  
+                  <div className="space-y-2">
+                    <Label htmlFor="signup-bio">Bio (Optional)</Label>
+                    <Input
+                      id="signup-bio"
+                      type="text"
+                      placeholder="Tell us about yourself..."
+                      value={bio}
+                      onChange={(e) => setBio(e.target.value)}
+                    />
+                  </div>
+                  
+                  <div className="flex gap-2">
+                    <Button 
+                      type="button" 
+                      variant="outline" 
+                      className="flex-1"
+                      onClick={() => setSignupStep('email-verify')}
+                    >
+                      Back
+                    </Button>
+                    <Button type="submit" className="flex-1" disabled={loading}>
+                      Continue
+                    </Button>
+                  </div>
+                </form>
+              )}
+
+              {signupStep === 'complete' && (
+                <div className="space-y-6 py-4">
+                  <div className="text-center space-y-2">
+                    <div className="h-16 w-16 rounded-full bg-primary/10 flex items-center justify-center mx-auto">
+                      <Mail className="h-8 w-8 text-primary" />
+                    </div>
+                    <h3 className="text-xl font-semibold">Step 3: Verify Email Code</h3>
+                    <p className="text-muted-foreground text-sm">
+                      Enter the 6-digit code sent to <strong>{email}</strong>
+                    </p>
+                  </div>
+                  
+                  <div className="flex justify-center">
+                    <InputOTP maxLength={6} value={signupOtp} onChange={setSignupOtp}>
+                      <InputOTPGroup>
+                        <InputOTPSlot index={0} />
+                        <InputOTPSlot index={1} />
+                        <InputOTPSlot index={2} />
+                        <InputOTPSlot index={3} />
+                        <InputOTPSlot index={4} />
+                        <InputOTPSlot index={5} />
+                      </InputOTPGroup>
+                    </InputOTP>
+                  </div>
+
+                  <Button 
+                    onClick={handleVerifySignupOtp} 
+                    className="w-full" 
+                    disabled={loading || signupOtp.length !== 6}
+                  >
+                    {loading ? (
+                      <>
+                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                        Creating Account...
+                      </>
+                    ) : (
+                      "Verify & Create Account"
+                    )}
+                  </Button>
+
+                  <div className="flex justify-between items-center text-sm">
+                    <Button 
+                      variant="link" 
+                      className="p-0 h-auto"
+                      onClick={() => resendOtp('signup')}
                       disabled={loading}
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="signup-city">
-                      City <span className="text-destructive">*</span>
-                    </Label>
-                    <CitySelector
-                      value={city}
-                      onValueChange={setCity}
-                      country={country}
-                      disabled={loading || !country}
-                    />
+                    >
+                      Resend Code
+                    </Button>
+                    <Button 
+                      variant="link" 
+                      className="p-0 h-auto"
+                      onClick={() => setSignupStep('details')}
+                    >
+                      Back
+                    </Button>
                   </div>
                 </div>
-                <div className="space-y-2">
-                  <Label htmlFor="signup-bio">Bio (Optional)</Label>
-                  <Input
-                    id="signup-bio"
-                    type="text"
-                    placeholder="Tell us about yourself..."
-                    value={bio}
-                    onChange={(e) => setBio(e.target.value)}
-                  />
-                </div>
-                <Button type="submit" className="w-full" disabled={loading}>
-                  {loading ? "Creating account..." : "Sign Up"}
-                </Button>
-              </form>
+              )}
             </TabsContent>
+            
+            {/* FORGOT PASSWORD TAB */}
             <TabsContent value="forgot">
               {resetSent ? (
                 <div className="text-center py-6 space-y-4">
